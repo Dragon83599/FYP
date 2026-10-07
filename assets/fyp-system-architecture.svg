@@ -1,0 +1,266 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1100" viewBox="0 0 1800 1100">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbfdfe"/>
+      <stop offset="0.55" stop-color="#f1f6f8"/>
+      <stop offset="1" stop-color="#e1edf2"/>
+    </linearGradient>
+
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f5fafb"/>
+    </linearGradient>
+
+    <linearGradient id="block" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fbfc"/>
+      <stop offset="1" stop-color="#eaf2f5"/>
+    </linearGradient>
+
+    <linearGradient id="audio" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1ea88f"/>
+      <stop offset="1" stop-color="#52d9bb"/>
+    </linearGradient>
+
+    <linearGradient id="bt" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3f73c8"/>
+      <stop offset="1" stop-color="#6e9be7"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#31515f" flood-opacity="0.13"/>
+    </filter>
+
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.2" fill="#a6bec8" opacity="0.24"/>
+    </pattern>
+
+    <marker id="arrowAudio" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0 L12 6 L0 12 z" fill="#2ab99b"/>
+    </marker>
+    <marker id="arrowBt" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0 L12 6 L0 12 z" fill="#4d83d8"/>
+    </marker>
+    <marker id="arrowSoft" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0 L12 6 L0 12 z" fill="#9aacb5"/>
+    </marker>
+  </defs>
+
+  <rect width="1800" height="1100" fill="url(#bg)"/>
+  <rect width="1800" height="1100" fill="url(#dots)"/>
+
+  <text x="60" y="72" fill="#17333d" font-family="Arial, sans-serif" font-size="34" font-weight="700">FYP SYSTEM ARCHITECTURE</text>
+  <text x="60" y="108" fill="#617b86" font-family="Arial, sans-serif" font-size="16">Two-part device with a wireless probe-to-host link and Bluetooth host-to-phone/server link</text>
+  <text x="60" y="134" fill="#8aa0aa" font-family="Arial, sans-serif" font-size="13">Revised baseline v0.2 - 2026-10-07 - wireless probe + independent host</text>
+
+  <g transform="translate(1180 48)">
+    <rect x="0" y="0" width="560" height="92" rx="18" fill="#ffffff" stroke="#d5e3e8" stroke-width="1.5" filter="url(#shadow)"/>
+    <line x1="24" y1="32" x2="72" y2="32" stroke="url(#audio)" stroke-width="5" stroke-linecap="round"/>
+    <line x1="72" y1="32" x2="84" y2="32" stroke="#2ab99b" stroke-width="5" stroke-linecap="round" marker-end="url(#arrowAudio)"/>
+    <text x="100" y="37" fill="#31505c" font-family="Arial, sans-serif" font-size="13">Wireless audio link</text>
+    <line x1="290" y1="32" x2="350" y2="32" stroke="url(#bt)" stroke-width="4" stroke-linecap="round"/>
+    <line x1="350" y1="32" x2="362" y2="32" stroke="#4d83d8" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowBt)"/>
+    <text x="378" y="37" fill="#31505c" font-family="Arial, sans-serif" font-size="13">Bluetooth link</text>
+    <text x="24" y="70" fill="#8aa0aa" font-family="Arial, sans-serif" font-size="12">Solid = audio / data path - Dashed = control, result or optional path</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="50" y="170" width="600" height="560" rx="26" fill="url(#panel)" stroke="#b9d8d2" stroke-width="2" stroke-dasharray="11 8"/>
+    <rect x="770" y="170" width="640" height="560" rx="26" fill="url(#panel)" stroke="#c8d9df" stroke-width="1.5"/>
+    <rect x="1450" y="170" width="300" height="560" rx="26" fill="url(#panel)" stroke="#d7e4e9" stroke-width="1.5"/>
+  </g>
+
+  <g font-family="Arial, sans-serif">
+    <circle cx="86" cy="214" r="20" fill="#e1f7f0" stroke="#2ab99b" stroke-width="2"/>
+    <text x="86" y="220" text-anchor="middle" fill="#187a68" font-size="18" font-weight="700">1</text>
+    <text x="120" y="212" fill="#17333d" font-size="19" font-weight="700">WIRELESS PROBE</text>
+    <text x="120" y="236" fill="#78909a" font-size="12">owner: teammate - chest contact - digitize at source</text>
+
+    <circle cx="806" cy="214" r="20" fill="#e8f0ff" stroke="#4d83d8" stroke-width="2"/>
+    <text x="806" y="220" text-anchor="middle" fill="#315fae" font-size="18" font-weight="700">2</text>
+    <text x="840" y="212" fill="#17333d" font-size="19" font-weight="700">HOST</text>
+    <text x="840" y="236" fill="#78909a" font-size="12">owner: you - receive - display - playback - edge AI</text>
+
+    <circle cx="1486" cy="214" r="20" fill="#fff1e5" stroke="#e49a58" stroke-width="2"/>
+    <text x="1486" y="220" text-anchor="middle" fill="#a7652d" font-size="18" font-weight="700">3</text>
+    <text x="1520" y="212" fill="#17333d" font-size="19" font-weight="700">PHONE / SERVER</text>
+    <text x="1520" y="236" fill="#78909a" font-size="12">GUI, gateway, storage</text>
+  </g>
+
+  <g font-family="Arial, sans-serif" font-size="13">
+    <rect x="88" y="264" width="524" height="62" rx="14" fill="url(#block)" stroke="#bfd7d3" stroke-width="1.4"/>
+    <text x="112" y="291" fill="#1d3b45" font-size="15" font-weight="700">PIEZO / PVDF OR MIC SENSOR</text>
+    <text x="112" y="312" fill="#79909a" font-size="12">S1 / S2 body-sound pickup - final sensor still to be selected</text>
+
+    <rect x="88" y="346" width="524" height="62" rx="14" fill="url(#block)" stroke="#bfd7d3" stroke-width="1.4"/>
+    <text x="112" y="373" fill="#1d3b45" font-size="15" font-weight="700">ANALOG FRONT END</text>
+    <text x="112" y="394" fill="#79909a" font-size="12">gain - bias - 20 Hz high-pass - anti-alias low-pass</text>
+
+    <rect x="88" y="428" width="524" height="62" rx="14" fill="url(#block)" stroke="#bfd7d3" stroke-width="1.4"/>
+    <text x="112" y="455" fill="#1d3b45" font-size="15" font-weight="700">ADC + DMA</text>
+    <text x="112" y="476" fill="#79909a" font-size="12">8 kHz - 16-bit - single channel - deterministic capture</text>
+
+    <rect x="88" y="510" width="524" height="62" rx="14" fill="url(#block)" stroke="#bfd7d3" stroke-width="1.4"/>
+    <text x="112" y="537" fill="#1d3b45" font-size="15" font-weight="700">PROBE MCU + FRAME PACKER</text>
+    <text x="112" y="558" fill="#79909a" font-size="12">ring buffer - 20 ms frame - sequence - timestamp - CRC16</text>
+
+    <rect x="88" y="592" width="524" height="62" rx="14" fill="url(#block)" stroke="#bfd7d3" stroke-width="1.4"/>
+    <text x="112" y="619" fill="#1d3b45" font-size="15" font-weight="700">WIRELESS TX</text>
+    <text x="112" y="640" fill="#79909a" font-size="12">BLE / 2.4 GHz / Wi-Fi / proprietary - to be selected</text>
+
+    <rect x="88" y="674" width="524" height="34" rx="12" fill="#eef7f4" stroke="#c8e0da" stroke-width="1.2"/>
+    <text x="112" y="696" fill="#47736a" font-size="12">Battery and power management are local to the probe.</text>
+  </g>
+
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <line x1="350" y1="326" x2="350" y2="346" stroke="url(#audio)" stroke-width="5" marker-end="url(#arrowAudio)"/>
+    <line x1="350" y1="408" x2="350" y2="428" stroke="url(#audio)" stroke-width="5" marker-end="url(#arrowAudio)"/>
+    <line x1="350" y1="490" x2="350" y2="510" stroke="url(#audio)" stroke-width="5" marker-end="url(#arrowAudio)"/>
+    <line x1="350" y1="572" x2="350" y2="592" stroke="url(#audio)" stroke-width="5" marker-end="url(#arrowAudio)"/>
+  </g>
+
+  <g font-family="Arial, sans-serif">
+    <rect x="690" y="438" width="42" height="78" rx="14" fill="#e7f7f2" stroke="#73cdb8" stroke-width="1.6"/>
+    <path d="M700 463 C710 452 722 474 711 486 C701 498 695 485 702 476" fill="none" stroke="#2ab99b" stroke-width="3" stroke-linecap="round"/>
+    <path d="M700 491 C710 480 722 502 711 514 C701 526 695 513 702 504" fill="none" stroke="#2ab99b" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+    <line x1="650" y1="477" x2="690" y2="477" stroke="url(#audio)" stroke-width="6" marker-end="url(#arrowAudio)"/>
+    <line x1="732" y1="477" x2="770" y2="477" stroke="url(#audio)" stroke-width="6" marker-end="url(#arrowAudio)"/>
+    <text x="648" y="426" fill="#1d3b45" font-size="14" font-weight="700" text-anchor="middle">WIRELESS</text>
+    <text x="648" y="446" fill="#1d3b45" font-size="14" font-weight="700" text-anchor="middle">LINK A</text>
+    <text x="648" y="545" fill="#2a7869" font-size="12" font-weight="700" text-anchor="middle">method TBD</text>
+    <text x="648" y="563" fill="#6f8a92" font-size="11" text-anchor="middle">min 140.8 kbps</text>
+    <text x="648" y="580" fill="#6f8a92" font-size="11" text-anchor="middle">application payload</text>
+  </g>
+
+  <g font-family="Arial, sans-serif" font-size="13">
+    <rect x="806" y="264" width="360" height="62" rx="14" fill="url(#block)" stroke="#c8d9df" stroke-width="1.4"/>
+    <text x="830" y="291" fill="#1d3b45" font-size="15" font-weight="700">LINK A RX + DE-FRAME</text>
+    <text x="830" y="312" fill="#79909a" font-size="12">fragment reassembly - CRC - sequence and loss tracking</text>
+
+    <rect x="806" y="346" width="360" height="62" rx="14" fill="url(#block)" stroke="#c8d9df" stroke-width="1.4"/>
+    <text x="830" y="373" fill="#1d3b45" font-size="15" font-weight="700">HOST MCU / SoC</text>
+    <text x="830" y="394" fill="#79909a" font-size="12">buffering - DSP - display and playback scheduling</text>
+
+    <rect x="806" y="428" width="360" height="62" rx="14" fill="url(#block)" stroke="#c8d9df" stroke-width="1.4"/>
+    <text x="830" y="455" fill="#1d3b45" font-size="15" font-weight="700">EDGE AI</text>
+    <text x="830" y="476" fill="#79909a" font-size="12">band-limit - 2:1 decimation - 4 kHz model input</text>
+
+    <rect x="806" y="510" width="360" height="62" rx="14" fill="url(#block)" stroke="#c8d9df" stroke-width="1.4"/>
+    <text x="830" y="537" fill="#1d3b45" font-size="15" font-weight="700">DISPLAY + SPEAKER</text>
+    <text x="830" y="558" fill="#79909a" font-size="12">live PCG waveform - S1/S2 status - heart-sound playback</text>
+
+    <rect x="806" y="592" width="360" height="62" rx="14" fill="url(#block)" stroke="#c8d9df" stroke-width="1.4"/>
+    <text x="830" y="619" fill="#1d3b45" font-size="15" font-weight="700">LOCAL CACHE</text>
+    <text x="830" y="640" fill="#79909a" font-size="12">measurement sessions - upload queue - offline operation</text>
+
+    <rect x="1194" y="264" width="180" height="62" rx="14" fill="#eef4ff" stroke="#c7d8f4" stroke-width="1.4"/>
+    <text x="1284" y="291" fill="#315fae" font-size="14" font-weight="700" text-anchor="middle">POWER</text>
+    <text x="1284" y="312" fill="#7890ad" font-size="11" text-anchor="middle">battery + charging</text>
+
+    <rect x="1194" y="346" width="180" height="62" rx="14" fill="#eef4ff" stroke="#c7d8f4" stroke-width="1.4"/>
+    <text x="1284" y="373" fill="#315fae" font-size="14" font-weight="700" text-anchor="middle">BLUETOOTH</text>
+    <text x="1284" y="394" fill="#7890ad" font-size="11" text-anchor="middle">link B module</text>
+
+    <rect x="1194" y="428" width="180" height="226" rx="14" fill="#f8fbff" stroke="#d5e1f4" stroke-width="1.3"/>
+    <text x="1284" y="458" fill="#315fae" font-size="13" font-weight="700" text-anchor="middle">HOST EDGE</text>
+    <text x="1284" y="480" fill="#315fae" font-size="13" font-weight="700" text-anchor="middle">REQUIREMENTS</text>
+    <text x="1212" y="512" fill="#657d91" font-size="11">- offline operation</text>
+    <text x="1212" y="535" fill="#657d91" font-size="11">- display and playback</text>
+    <text x="1212" y="558" fill="#657d91" font-size="11">- edge inference</text>
+    <text x="1212" y="581" fill="#657d91" font-size="11">- two-link coexistence</text>
+    <text x="1212" y="604" fill="#657d91" font-size="11">- local session cache</text>
+    <text x="1212" y="627" fill="#657d91" font-size="11">- no server dependency</text>
+  </g>
+
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <line x1="986" y1="326" x2="986" y2="346" stroke="url(#audio)" stroke-width="5" marker-end="url(#arrowAudio)"/>
+    <line x1="986" y1="408" x2="986" y2="428" stroke="url(#audio)" stroke-width="5" marker-end="url(#arrowAudio)"/>
+    <line x1="986" y1="490" x2="986" y2="510" stroke="url(#audio)" stroke-width="5" marker-end="url(#arrowAudio)"/>
+    <line x1="986" y1="572" x2="986" y2="592" stroke="url(#audio)" stroke-width="5" marker-end="url(#arrowAudio)"/>
+    <line x1="1166" y1="377" x2="1194" y2="377" stroke="#4d83d8" stroke-width="3" stroke-dasharray="7 6" marker-end="url(#arrowBt)"/>
+  </g>
+
+  <g font-family="Arial, sans-serif">
+    <line x1="1410" y1="508" x2="1450" y2="508" stroke="url(#bt)" stroke-width="5" marker-end="url(#arrowBt)"/>
+    <text x="1430" y="468" fill="#315fae" font-size="13" font-weight="700" text-anchor="middle">LINK B</text>
+    <text x="1430" y="488" fill="#315fae" font-size="11" text-anchor="middle">Bluetooth</text>
+
+    <rect x="1478" y="264" width="244" height="86" rx="16" fill="#f8fbff" stroke="#c7d8f4" stroke-width="1.5"/>
+    <text x="1500" y="296" fill="#315fae" font-size="15" font-weight="700">PHONE APP / GATEWAY</text>
+    <text x="1500" y="318" fill="#7890ad" font-size="11">optional user interface</text>
+    <text x="1500" y="335" fill="#7890ad" font-size="11">relay to cloud server</text>
+
+    <rect x="1478" y="382" width="244" height="86" rx="16" fill="#fff7ef" stroke="#efceb0" stroke-width="1.5"/>
+    <text x="1500" y="414" fill="#a7652d" font-size="15" font-weight="700">SERVER / STORAGE</text>
+    <text x="1500" y="436" fill="#b08a69" font-size="11">sessions, metadata, results</text>
+    <text x="1500" y="453" fill="#b08a69" font-size="11">not required for live use</text>
+
+    <rect x="1478" y="500" width="244" height="86" rx="16" fill="#f8fbff" stroke="#c7d8f4" stroke-width="1.5"/>
+    <text x="1500" y="532" fill="#315fae" font-size="15" font-weight="700">GUI / REPORT</text>
+    <text x="1500" y="554" fill="#7890ad" font-size="11">waveform and results</text>
+    <text x="1500" y="571" fill="#7890ad" font-size="11">local or remote view</text>
+
+    <path d="M1600 350 L1600 382" fill="none" stroke="#4d83d8" stroke-width="3" stroke-dasharray="7 6" marker-end="url(#arrowBt)"/>
+    <path d="M1600 468 L1600 500" fill="none" stroke="#9aacb5" stroke-width="2.5" stroke-dasharray="6 6" marker-end="url(#arrowSoft)"/>
+
+    <text x="1478" y="626" fill="#78909a" font-size="11">Host can talk directly to a nearby</text>
+    <text x="1478" y="644" fill="#78909a" font-size="11">Bluetooth server, or use the phone</text>
+    <text x="1478" y="662" fill="#78909a" font-size="11">as a gateway to a cloud server.</text>
+  </g>
+
+  <g>
+    <rect x="50" y="770" width="1700" height="270" rx="26" fill="#ffffff" stroke="#d7e4e9" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="82" y="814" fill="#17333d" font-family="Arial, sans-serif" font-size="20" font-weight="700">TIMING, FRAME AND LINK CONTRACT - v0.2</text>
+    <text x="82" y="838" fill="#7c939d" font-family="Arial, sans-serif" font-size="13">The probe digitizes before wireless transmission. The host must remain usable without the phone or server.</text>
+
+    <g font-family="Arial, sans-serif">
+      <rect x="82" y="870" width="226" height="116" rx="16" fill="#f3f8fa" stroke="#d8e5ea" stroke-width="1.5"/>
+      <text x="102" y="900" fill="#7c939d" font-size="11">SIGNAL BAND</text>
+      <text x="102" y="933" fill="#1d3b45" font-size="21" font-weight="700">20-1000 Hz</text>
+      <text x="102" y="960" fill="#93a8b0" font-size="11">diagnostic band</text>
+
+      <rect x="326" y="870" width="226" height="116" rx="16" fill="#f3f8fa" stroke="#d8e5ea" stroke-width="1.5"/>
+      <text x="346" y="900" fill="#7c939d" font-size="11">ACQUISITION</text>
+      <text x="346" y="933" fill="#1d3b45" font-size="21" font-weight="700">8 kHz / 16-bit</text>
+      <text x="346" y="960" fill="#93a8b0" font-size="11">single channel</text>
+
+      <rect x="570" y="870" width="226" height="116" rx="16" fill="#f3f8fa" stroke="#d8e5ea" stroke-width="1.5"/>
+      <text x="590" y="900" fill="#7c939d" font-size="11">LOGICAL FRAME</text>
+      <text x="590" y="933" fill="#1d3b45" font-size="21" font-weight="700">160 / 20 ms</text>
+      <text x="590" y="960" fill="#93a8b0" font-size="11">payload 320 B</text>
+
+      <rect x="814" y="870" width="226" height="116" rx="16" fill="#f3f8fa" stroke="#d8e5ea" stroke-width="1.5"/>
+      <text x="834" y="900" fill="#7c939d" font-size="11">WIRE FRAME</text>
+      <text x="834" y="933" fill="#1d3b45" font-size="21" font-weight="700">352 B</text>
+      <text x="834" y="960" fill="#93a8b0" font-size="11">30 B header + 2 B CRC</text>
+
+      <rect x="1058" y="870" width="226" height="116" rx="16" fill="#f3f8fa" stroke="#d8e5ea" stroke-width="1.5"/>
+      <text x="1078" y="900" fill="#7c939d" font-size="11">AI INPUT</text>
+      <text x="1078" y="933" fill="#1d3b45" font-size="21" font-weight="700">4 kHz</text>
+      <text x="1078" y="960" fill="#93a8b0" font-size="11">2:1 decimation</text>
+
+      <rect x="1302" y="870" width="226" height="116" rx="16" fill="#eefaf6" stroke="#bfe4d9" stroke-width="1.5"/>
+      <text x="1322" y="900" fill="#4f8b7d" font-size="11">LINK A</text>
+      <text x="1322" y="933" fill="#1d3b45" font-size="21" font-weight="700">Wireless</text>
+      <text x="1322" y="960" fill="#6e9b90" font-size="11">min 140.8 kbps app payload</text>
+
+      <rect x="1546" y="870" width="172" height="116" rx="16" fill="#eef4ff" stroke="#c7d8f4" stroke-width="1.5"/>
+      <text x="1566" y="900" fill="#5f7fae" font-size="11">LINK B</text>
+      <text x="1566" y="933" fill="#1d3b45" font-size="21" font-weight="700">Bluetooth</text>
+      <text x="1566" y="960" fill="#7890ad" font-size="11">phone or server</text>
+    </g>
+
+    <g opacity="0.6">
+      <line x1="82" y1="1014" x2="430" y2="1014" stroke="#9fb2ba" stroke-width="1"/>
+      <circle cx="438" cy="1014" r="3" fill="#2ab99b"/>
+      <line x1="446" y1="1014" x2="620" y2="1014" stroke="#9fb2ba" stroke-width="1"/>
+    </g>
+  </g>
+</svg>

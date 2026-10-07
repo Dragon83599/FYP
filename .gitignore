@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+~$*.pptx
+*.tmp
+*.log
+
+.DS_Store
+Thumbs.db
+desktop.ini
