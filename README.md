@@ -5,17 +5,39 @@
 ## 已确认的产品与链路基线
 
 - 产品形态：二体式，无线探头 + 独立主机。
-- 探头与主机：必须无线连接，具体制式不限。
-- 主机与外部设备：通过蓝牙连接手机或服务器。
-- 手机可以作为网关，再通过蜂窝网络或 Wi-Fi 连接云端服务器。
+- 探头与主机：必须无线连接，候选方案为 BLE 5.0 GATT。
+- 主机与外部设备：通过 Wi-Fi 连接手机、本地服务器或局域网网关。
+- 支持主机 SoftAP、外部 AP 和手机热点；手机可继续作为云端上传网关。
 - 主机脱离手机和服务器时仍能完成采集、显示、回放和边缘初步诊断。
 - 分工建议：队友负责探头端，本人负责主机端；Link A 两端和协议由双方共同冻结。
 - 最新组会结论见 `docs/group-meeting-2026-10-06-decisions.md`。
 
 ## 阶段 0 产物
 
+- `AGENTS.md`：项目工程决策规范，所有后续对话必须遵守。
+- `docs/engineering-decision-guide.md`：候选方案对比、证据等级和 ADR 模板。
+- `docs/engineering-decision-register.md`：当前硬件、协议和架构决策登记表。
+- `docs/progress-2026-10-08.md`：10 月 7 日至 8 日的协议、AI、学习和决策进度摘要。
+- `docs/ai-model-resource-budget-guide.md`：从数据、训练、量化到目标板资源预算的入门指南。
+- `docs/ai-baseline-plan.md`：第一版心音 AI 的候选方案对比、实测预算和验证计划。
 - `docs/phase0-interface-freeze.md`：v0.2 接口基线、决策理由、测试向量和验收清单。
+- `docs/link-a-interface-freeze.md`：探头到主机的 `LKA1` 分包与重组协议。
+- `docs/connectivity-topology.md`：BLE 探头链路和 Wi-Fi 主机链路的拓扑决策。
+- `docs/implementation-roadmap.md`：软件实施进度和硬件接入条件。
 - `shared/include/audio_protocol.h`：探头固件与主机软件共同使用的 C/C++ 兼容接口定义。
+- `shared/include/link_a_protocol.h`：无线链路 A 的分片和重组接口。
+
+## 可运行验证
+
+```text
+npm test
+npm run sim:demo
+node tools/audio-sim/probe-simulator.mjs input-8k.wav probe.lka
+node tools/audio-sim/host-receiver.mjs probe.lka output-8k.wav --ai ai-input-4k.wav
+```
+
+Node 测试不需要第三方依赖。演示程序会生成 8 kHz 原始 WAV、经模拟链路
+接收的 WAV，以及抽取后的 4 kHz AI 输入 WAV。
 
 ## 当前基线
 
@@ -25,15 +47,18 @@
 - 逻辑帧：20 ms，即每声道 160 个 `int16_t` 样本。
 - 时间信息：`uint32_t sequence` 和 `uint32_t timestamp_ms`。
 - 探头到主机链路：无线，制式待定，应用层最低约 140.8 kbps。
-- 主机到外部链路：蓝牙连接手机或服务器。
+- 链路 A 候选方案：BLE 5.0 GATT，ATT MTU 247，单分片负载 222 B，持续吞吐至少 320 kbps。
+- 主机到外部链路：Wi-Fi 连接手机或服务器。
 
 ## 下一步
 
-1. 按冻结文档第 9 节确认探头无线制式、蓝牙方案和两段链路的器件选型。
+1. 按冻结文档第 9 节确认 BLE 5.0 模块、主机 Wi-Fi 方案和两段链路的器件选型。
 2. 分别填写探头主控、主机主控、传感器、ADC 路径和无线模块的最终值。
 3. 双方用第 6.1 节测试向量核对 header 与 CRC。
-4. 完成两段无线链路的连续传输、共存和故障测试。
-5. 完成第 8 节全部验收项后，将文档状态改为“已冻结”并升级版本号。
+4. 将 `shared/src/audio_protocol.c` 和 `shared/src/link_a_protocol.c` 接入
+   探头与主机固件。
+5. 完成两段无线链路的连续传输、共存和故障测试。
+6. 完成第 8 节全部验收项后，将文档状态改为“已冻结”并升级版本号。
 
 ## 参考资料
 
@@ -46,4 +71,8 @@
 - `assets/archive/`：更新前的 v1 架构图和产品图。
 - `docs/`：阶段 0 基线、组会确认结论和会前参考。
 - `meetings/2026-10-06/`：2026-10-06 组会大纲、讲稿、PPTX 和生成脚本。
-- `shared/include/`：探头固件与主机软件共用的 C/C++ 接口定义。
+- `meetings/templates/engineering-decision-slides.md`：后续组会方案对比页模板。
+- `shared/`：探头固件与主机软件共用的 C/C++ 接口定义和实现。
+- `tools/audio-sim/`：零依赖的协议与音频链路模拟器。
+- `tools/ai/`：CirCor 数据准备、合成 PCG、逻辑回归与 1D CNN 基线和资源预算脚本。
+- `tests/`：C 和 Node 自动化测试。

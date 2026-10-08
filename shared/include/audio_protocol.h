@@ -45,6 +45,22 @@ typedef enum {
 } audio_codec_t;
 
 typedef enum {
+    AUDIO_STATUS_OK = 0,
+    AUDIO_STATUS_INVALID_ARGUMENT = -1,
+    AUDIO_STATUS_BUFFER_TOO_SMALL = -2,
+    AUDIO_STATUS_TRUNCATED = -3,
+    AUDIO_STATUS_BAD_MAGIC = -4,
+    AUDIO_STATUS_BAD_VERSION = -5,
+    AUDIO_STATUS_BAD_HEADER = -6,
+    AUDIO_STATUS_BAD_CODEC = -7,
+    AUDIO_STATUS_BAD_CHANNELS = -8,
+    AUDIO_STATUS_BAD_SAMPLE_RATE = -9,
+    AUDIO_STATUS_BAD_FRAME_SAMPLES = -10,
+    AUDIO_STATUS_BAD_PAYLOAD_SIZE = -11,
+    AUDIO_STATUS_BAD_CRC = -12
+} audio_protocol_status_t;
+
+typedef enum {
     AUDIO_FLAG_TIMESTAMP_VALID = 1u << 0
 } audio_frame_flags_t;
 
@@ -82,11 +98,7 @@ typedef struct {
     uint8_t bytes[AUDIO_WIRE_HEADER_BYTES];
 } audio_wire_header_t;
 
-/*
- * Serialize fields into the fixed little-endian wire header. The function must
- * return non-zero on success. The implementation and CRC helper are added in
- * phase 1 after both teams freeze this contract.
- */
+/* Serialize fields into the fixed little-endian wire header. */
 int audio_protocol_encode_header(
     audio_wire_header_t *header,
     const audio_frame_t *frame,
@@ -94,12 +106,31 @@ int audio_protocol_encode_header(
 
 /*
  * Parse and validate a fixed wire header without depending on host alignment
- * or endianness. The function must return non-zero on success.
+ * or endianness.
  */
 int audio_protocol_decode_header(
     const audio_wire_header_t *header,
     audio_frame_t *frame,
     uint8_t *flags);
+
+/*
+ * Encode or decode a complete AUD1 frame. Decode accepts a buffer that may
+ * contain additional bytes; consumed receives the number of bytes belonging
+ * to the decoded frame.
+ */
+int audio_protocol_encode_frame(
+    uint8_t *output,
+    size_t output_capacity,
+    const audio_frame_t *frame,
+    uint8_t flags,
+    size_t *output_length);
+
+int audio_protocol_decode_frame(
+    const uint8_t *input,
+    size_t input_length,
+    audio_frame_t *frame,
+    uint8_t *flags,
+    size_t *consumed);
 
 /*
  * CRC-16/CCITT-FALSE:

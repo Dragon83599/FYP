@@ -1,0 +1,12 @@
+{
+  "name": "fyp-software-foundation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/node/audio-protocol.test.mjs tests/node/dsp-wav.test.mjs tests/node/link-a-protocol.test.mjs tests/node/pipeline.test.mjs",
+    "sim:demo": "node tools/audio-sim/demo.mjs",
+    "sim:probe": "node tools/audio-sim/probe-simulator.mjs",
+    "sim:host": "node tools/audio-sim/host-receiver.mjs"
+  }
+}

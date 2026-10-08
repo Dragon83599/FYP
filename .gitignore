@@ -10,3 +10,10 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+build/
+data/
+.venv/
+*.pt
+*.onnx
+*.tflite
+*.npz

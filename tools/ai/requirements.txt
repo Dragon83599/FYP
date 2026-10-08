@@ -1,0 +1,10 @@
+# Pinned environment used for the CirCor baseline on 2026-10-07.
+# Install with:
+#   python -m venv .venv
+#   .venv\Scripts\python.exe -m pip install -r tools/ai/requirements.txt
+numpy==2.5.3
+torch==2.14.1
+torchinfo==1.8.0
+onnx==1.23.2
+onnxruntime==1.30.0
+onnxscript==0.7.2
