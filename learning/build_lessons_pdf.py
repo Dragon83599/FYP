@@ -25,8 +25,7 @@ from reportlab.platypus import (
 )
 
 REPO = Path(__file__).resolve().parents[1]
-SOURCE = REPO / "learning" / "lessons_L18-L36.md"
-OUTPUT = REPO / "learning" / "lessons_L18-L36.pdf"
+LEARNING = REPO / "learning"
 
 FONTS = Path(r"C:\Windows\Fonts")
 
@@ -229,7 +228,7 @@ def decorate(canvas, doc):
     canvas.saveState()
     canvas.setFont(F["body"], 7.6)
     canvas.setFillColor(colors.HexColor("#8a99a6"))
-    canvas.drawString(21 * mm, 12 * mm, "心音边缘 AI 学习课 L18-L36")
+    canvas.drawString(21 * mm, 12 * mm, getattr(doc, "title", "心音边缘 AI 学习课"))
     canvas.drawRightString(189 * mm, 12 * mm, "第 %d 页" % doc.page)
     canvas.setStrokeColor(colors.HexColor("#dbe6ec"))
     canvas.setLineWidth(0.5)
@@ -237,23 +236,40 @@ def decorate(canvas, doc):
     canvas.restoreState()
 
 
-def main():
-    md = SOURCE.read_text(encoding="utf-8")
+def build(md_path: Path) -> Path:
+    md = md_path.read_text(encoding="utf-8")
     story = parse(md)
+    pdf_path = md_path.with_suffix(".pdf")
+    title = next(
+        (line.lstrip("# ").strip() for line in md.splitlines() if line.startswith("# ")),
+        md_path.stem,
+    )
     doc = BaseDocTemplate(
-        str(OUTPUT),
+        str(pdf_path),
         pagesize=A4,
         leftMargin=21 * mm,
         rightMargin=21 * mm,
         topMargin=18 * mm,
         bottomMargin=20 * mm,
-        title="心音边缘 AI 学习课 L18-L36",
+        title=title,
         author="FYP 学习笔记",
     )
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="main")
     doc.addPageTemplates([PageTemplate(id="all", frames=[frame], onPage=decorate)])
     doc.build(story)
-    print("wrote", OUTPUT, OUTPUT.stat().st_size, "bytes")
+    print("wrote", pdf_path, pdf_path.stat().st_size, "bytes")
+    return pdf_path
+
+
+def main():
+    requested = [Path(a) for a in sys.argv[1:]]
+    sources = requested or sorted(LEARNING.glob("lessons_L*.md"))
+    if not sources:
+        raise SystemExit("no source markdown found")
+    for md_path in sources:
+        if not md_path.is_absolute():
+            md_path = (REPO / md_path).resolve()
+        build(md_path)
 
 
 if __name__ == "__main__":

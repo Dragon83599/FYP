@@ -189,8 +189,9 @@ ADR 时一并统一口径。
 
 ## 10. 课程总表（共 36 节）
 
-课程分成三个阶段，每阶段 12 节。L01 到 L17 已完成；L18 到 L36 的讲义已交付
-（`learning/lessons_L18-L36.md`），其中 L18-L24 待动手复现，L25-L36 待开发板实测。
+课程分成三个阶段，每阶段 12 节。L01 到 L17 已完成，讲义见 `learning/lessons_L01-L17.md`；
+L18 到 L36 的讲义见 `learning/lessons_L18-L36.md`，其中 L18-L24 待动手复现，
+L25-L36 待开发板实测。两份讲义都有配套 PDF。
 
 ### 阶段一：软件基础（第 1 到 4 周）
 
@@ -250,7 +251,8 @@ ADR 时一并统一口径。
 > 更新时间：2026-10-16
 
 - 已完成：L01 到 L17（含脚本、讲解和思考题）。
-- 已交付离线讲义：L18 到 L36，见 `learning/lessons_L18-L36.md` 和同名 PDF。
+- 已交付离线讲义两份：`learning/lessons_L01-L17.md` 和 `learning/lessons_L18-L36.md`，
+  各自有配套 PDF，排版脚本是 `learning/build_lessons_pdf.py`。
 - 脚本目录：`learning/`；每课产物写在 `learning/outputs/lessonXX/`。
 - 已复现：L18 的 `tools/ai/train_cnn.py`（必须加 `--rebuild-cache` 才会按当前参数重建窗口缓存）。
 - 已发现并记录：`windows-*.npy` 缓存文件名不含预处理参数，脚本会静默复用旧缓存，看报告要先核对窗口数。
