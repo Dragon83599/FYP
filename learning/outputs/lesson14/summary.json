@@ -1,0 +1,17 @@
+{
+  "abnormal_record": "9979_AV",
+  "normal_record": "49998_MV",
+  "sample_rate": 4000,
+  "window_samples": 8000,
+  "n_fft": 256,
+  "hop_length": 100,
+  "n_mels": 40,
+  "fmin_hz": 20.0,
+  "fmax_hz": 1000.0,
+  "log_mel_shape": [
+    78,
+    40
+  ],
+  "feature_length": 128,
+  "abnormal_vs_normal_cosine": 0.984695
+}
