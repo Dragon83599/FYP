@@ -1,0 +1,21 @@
+{
+  "demo_band_hz": [
+    20.0,
+    200.0
+  ],
+  "demo_num_taps": 257,
+  "real_band_hz": [
+    20.0,
+    1000.0
+  ],
+  "real_sample_rate": 4000,
+  "real_rms_before": 0.09156514704227448,
+  "real_rms_after": 0.08714216202497482,
+  "repo_vs_ours_max_tap_difference": 0.0,
+  "checks": {
+    "gain_50hz": 0.9995721562376522,
+    "gain_120hz": 0.9986600857709026,
+    "gain_400hz": 0.0008998791997790474,
+    "stopband_reduction_400hz": 1218700.0137944445
+  }
+}

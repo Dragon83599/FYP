@@ -1,0 +1,9 @@
+{
+  "model": "nn.Linear(1, 1)",
+  "input_features": 1,
+  "output_features": 1,
+  "learning_rate": 0.1,
+  "epochs": 200,
+  "seed": 0,
+  "data": "x in [-1, 1], y = 2x + 1"
+}
