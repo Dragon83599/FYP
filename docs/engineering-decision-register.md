@@ -191,3 +191,26 @@ ADR-008 验收条件：
   BLE、Wi-Fi、显示和音频回放并发运行 5 分钟，记录丢帧、断连和复位。
 - 边缘约束：断网和关闭外部设备时仍能完成推理与结果显示；不得依赖手机、
   服务器或云端补充推理。
+
+## ADR-009：第一版心音数据集获取顺序（候选）
+
+| 项目 | 内容 |
+| --- | --- |
+| 状态 | 候选，2026-10-17 完成逐平台审计；许可证和版本确认前不冻结 |
+| 日期 | 2026-10-17 |
+| 决策问题 | 在 CirCor 已作为主训练集的条件下，第一版是否引入额外 PCG 数据集，以及引入顺序 |
+| 候选 0 | 维持 CirCor-only：只使用已经完成患者级复核的 CirCor 数据 |
+| 候选 A | CirCor + ZCHSound + PASCAL B：增加中国儿科质量/诊断、真实噪声杂音和 S1/S2 |
+| 候选 B | CirCor + PhysioNet 2016：增加跨设备正常/异常压力测试，但缺少逐条 patient ID |
+| 候选 C | 引入 Kaggle/Hugging Face/CQU 镜像或 BMD-HS：当前因许可证冲突、版本旧或链接失效不采用 |
+| 当前选择 | 候选 A 的“有条件获取”：CirCor 必选；ZCHSound 下载并审计；PASCAL B 仅在许可证或作者条件确认后进入训练 |
+| 量化数据 | CirCor 公开 3,163 条/942 人；ZCHSound 1,259 条/1,259 人、8.31 h；PASCAL B 461 条有标签记录、171 个文件名 ID；三者原始包约 0.9 GB（E1+E2） |
+| 患者级可行性 | CirCor 和 ZCHSound 可直接按患者隔离；PASCAL B 可重建但官方训练/测试有 125 个 ID 重叠，必须丢弃无标签测试并重新做患者级 5 折；PhysioNet 2016 缺公开 patient ID（E1+E2） |
+| 许可证 | CirCor 为 ODC-BY 1.0；ZCHSound 论文为 CC BY 4.0 但数据仓库无 LICENSE；PASCAL 未明确声明；PhysioNet 2016 为 ODC-BY 1.0。只有 CirCor 当前可视为低风险（E1+E3） |
+| 主要优势 | 同时覆盖杂音、S1/S2、质量、儿科诊断和真实噪声，且不改变 AUD1/LKA1 或端侧推理约束 |
+| 主要风险 | ZCHSound 数据许可和 README 统计不一致；PASCAL 许可不清且测试集标签不可得；跨队列采样率和设备差异导致域偏移 |
+| 验证 | 官方 SHA256/CRC；复算录音数、患者数、采样率、时长和标签分布；患者 ID 重叠必须为 0；统一 4 kHz、2 s 窗、1 s 步长后复跑患者级 5 折 |
+| 失败判据 | 许可无法确认；患者 ID 无法恢复或重切后仍有重叠；扩展集患者级 AUROC < CirCor-only 或 BA 明显下降且无法通过校准修复 |
+| 回退 | 保留 CirCor-only 和现有小型 1D CNN；额外数据只做离线外部测试；不采用镜像许可证，不外移推理 |
+| 受影响文件 | `docs/pcg-dataset-audit-2026-10-17.md`；后续数据脚本和 `docs/ai-baseline-plan.md` |
+| 下次复核 | ZCHSound 许可得到书面确认、PASCAL 许可得到确认，或完整数据 manifest 生成后 |
