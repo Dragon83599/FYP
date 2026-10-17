@@ -64,12 +64,14 @@ Node 测试不需要第三方依赖。演示程序会生成 8 kHz 原始 WAV、�
 
 - `docs/group-meeting-2026-10-06-decisions.md`：组会后确认的产品形态与链路结论。
 - `docs/group-meeting-2026-10-06-detailed-reference.md`：会前详细参考，已不再是当前连接方案的最终口径。
+- [`docs/reimbursement/README.md`](docs/reimbursement/README.md)：311 FYP 采购、报销和开票资料归档，以及材料核对清单。
 
 ## 仓库结构
 
 - `assets/`：当前系统架构图、产品图、原始需求图和老师板书图。
 - `assets/archive/`：更新前的 v1 架构图和产品图。
 - `docs/`：阶段 0 基线、组会确认结论和会前参考。
+- `docs/reimbursement/`：脱敏后的采购报销 SOP、单位开票资料和操作清单。
 - `meetings/2026-10-06/`：2026-10-06 组会大纲、讲稿、PPTX 和生成脚本。
 - `meetings/templates/engineering-decision-slides.md`：后续组会方案对比页模板。
 - `shared/`：探头固件与主机软件共用的 C/C++ 接口定义和实现。

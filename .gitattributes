@@ -1,0 +1,2 @@
+# Preserve PDF bytes and keep binary diffs out of code review.
+*.pdf binary
