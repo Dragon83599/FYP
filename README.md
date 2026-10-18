@@ -99,4 +99,4 @@ cd firmware && idf.py set-target esp32s3 && idf.py build
 - `tools/audio-sim/`：零依赖的协议与音频链路模拟器。
 - `tools/ai/`：CirCor 数据准备、合成 PCG、逻辑回归与 1D CNN 基线和资源预算脚本。
 - `firmware/`：ESP32-S3 主机固件（ESP-IDF v5.5.6），复用 `shared/` 的数据通路。
-- `tests/`：C 和 Node 自动化测试。
+- `tests/`：C 和 Node 自动化测试；`test_end_to_end_chain.c` 覆盖完整接收链（协议→数据通路→心率）。

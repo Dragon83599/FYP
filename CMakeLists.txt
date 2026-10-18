@@ -68,4 +68,22 @@ if(BUILD_TESTING)
     # agreement run is data-dependent and is invoked explicitly:
     #   build/test_hr_detector --fixture data/reports/hr-fixture-circor.csv
     add_test(NAME hr_detector COMMAND test_hr_detector)
+
+    # End-to-end composition test: 8 kHz PCM -> AUD1 -> LKA1 -> host_pipeline
+    # -> hr_detector. The synthetic cases need no data; the CirCor comparison
+    # is skipped with a message when data/processed/circor/recordings.csv is
+    # absent (as in CI).
+    add_executable(test_end_to_end_chain
+        tests/test_end_to_end_chain.c
+    )
+    target_link_libraries(test_end_to_end_chain PRIVATE fyp_audio_protocol)
+    if(MSVC)
+        target_compile_options(test_end_to_end_chain PRIVATE /W4)
+    else()
+        target_compile_options(test_end_to_end_chain PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(test_end_to_end_chain PRIVATE m)
+    endif()
+    target_compile_definitions(test_end_to_end_chain PRIVATE
+        TEST_E2E_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME end_to_end_chain COMMAND test_end_to_end_chain)
 endif()
