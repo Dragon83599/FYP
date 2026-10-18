@@ -633,3 +633,15 @@ ADR-008 验收条件：
 | 未验证 | 无硬件：真实心率精度、S3 上时延、运行时栈高水位、堆余量、BLE/MTU/PHY、屏幕渲染。DIRAM 静态余量 171,781 B，但 NimBLE 与各任务栈的运行时占用未测 |
 | 风险 | DIRAM 从 39% 升到 50%，余量仍够但已不可忽视；显示层仍是 stub，`HR ~` 只在日志中可见 |
 | 受影响文件 | `firmware/main/app_main.c`、`firmware/components/fyp_shared/CMakeLists.txt`、`firmware/README.md` |
+
+### ADR-013 三处遗留修复（2026-10-18）
+
+| 项目 | 内容 |
+| --- | --- |
+| 修复 1：窗口参数未进缓存键 | 缓存只校验划分（kind/path/fold/fingerprint/seed/ratio），改 `window_sec`、`hop_sec`、`max_windows_per_record`、`window_selection` 不会失效，会静默复用旧窗口。新增 `WINDOW_CACHE_FIELDS` + `window_cache_key()` + `window_cache_matches()`，与划分键**分开校验**（两者独立，必须同时匹配）。实测：改 `--window-sec 3.0` 触发重建，再跑同参数则静默复用 |
+| 修复 2：两处指纹口径不一致 | `cross_validate.load_frozen_folds()` 先把冻结文件过滤成"有窗口的患者"再算指纹，而 `train_cnn` 算整份文件；当前两者恰好相同，但一旦有患者切不出窗口就会出现两个不同的指纹。现**统一为整份文件**，并新增 `fingerprint_scope: "file"`、`subjects_in_file`、`subjects_used` 三个字段供读者核对 |
+| 修复 3：报告未记录训练种子 | 新增 `report.json["seeds"] = {"training": ..., "split": ...}`。此前读者可能把 `val_split.seed` 误当成训练种子；两者默认值分别是 20261007 与 20261008，混淆会直接导致不可复现 |
+| 顺带加固 | 新增缓存 schema 版本（`CACHE_SCHEMA = 2`）：provenance 结构变化但键不变时，旧缓存会被判定过期并重建一次，避免"新代码读旧 provenance、字段缺失却继续用" |
+| 行为变化 | 升级后第一次 `train_cnn` 运行必然重建一次窗口缓存（旧缓存无 `cache_schema` 与 `window_params`）；之后恢复正常的命中/失效逻辑 |
+| 测试 | 新增 5 项：窗口键相等/变更/缺失/JSON 往返、指纹口径（丢患者后仍等于文件指纹）。原有一条断言"子集指纹"的测试按其真实缺陷改写。Python **140 → 145** 项 |
+| 未解决 | 缓存键仍不包含预处理版本（如带通参数变更）；该风险目前由"重建需显式 `--rebuild-cache`"的人工约定兜底 |

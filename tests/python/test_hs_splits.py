@@ -39,6 +39,8 @@ from hs_splits import (
     split_cache_key,
     split_cache_matches,
     splits_fingerprint,
+    window_cache_key,
+    window_cache_matches,
     validate_splits,
     write_splits,
 )
@@ -596,7 +598,12 @@ class CrossValidationIntegrationTests(unittest.TestCase):
         self.assertIn("warning", buffer.getvalue())
         self.assertEqual(n_folds, 5)
         self.assertNotIn(dropped, set().union(*folds))
-        self.assertEqual(provenance["fingerprint"], splits_fingerprint({k: self.folds[k] for k in labels}))
+        # ADR-013: the cited fingerprint describes the FILE, not the windowed
+        # subset, so a filtered run cannot look like a different protocol than
+        # train_cnn cites for the same file.
+        self.assertEqual(provenance["fingerprint"], splits_fingerprint(self.folds))
+        self.assertEqual(provenance["fingerprint_scope"], "file")
+        self.assertLess(provenance["subjects_used"], provenance["subjects_in_file"])
 
 
 def _read_csv(path: Path) -> list[dict]:
@@ -823,3 +830,64 @@ class FrozenCacheKeyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WindowCacheKeyTests(unittest.TestCase):
+    """Window parameters must invalidate the cache independently of the split."""
+
+    def test_matching_parameters(self) -> None:
+        key = window_cache_key(2.0, 1.0, 4, "all")
+        self.assertTrue(window_cache_matches(dict(key), key))
+
+    def test_changed_parameter_does_not_match(self) -> None:
+        key = window_cache_key(2.0, 1.0, 4, "all")
+        for field, value in (
+            ("window_sec", 1.0),
+            ("hop_sec", 0.5),
+            ("max_windows_per_record", 8),
+            ("window_selection", "annotated"),
+        ):
+            changed = dict(key)
+            changed[field] = value
+            self.assertFalse(window_cache_matches(changed, key), field)
+
+    def test_missing_or_incomplete_provenance_does_not_match(self) -> None:
+        key = window_cache_key(2.0, 1.0, 4, "all")
+        self.assertFalse(window_cache_matches(None, key))
+        self.assertFalse(window_cache_matches({}, key))
+        partial = dict(key)
+        partial.pop("window_selection")
+        self.assertFalse(window_cache_matches(partial, key))
+
+    def test_json_round_trip_matches(self) -> None:
+        import json
+
+        key = window_cache_key(2.0, 1.0, 4, "annotated")
+        self.assertTrue(window_cache_matches(json.loads(json.dumps(key)), key))
+
+
+class FingerprintScopeTests(unittest.TestCase):
+    """The cited fingerprint must describe the file, not the windowed subset."""
+
+    def test_dropped_subjects_do_not_change_the_fingerprint(self) -> None:
+        labels = {f"s{i:02d}": i % 2 for i in range(20)}
+        folds = patient_folds(labels, 5, DEFAULT_SEED)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "splits.csv"
+            write_splits(path, folds, labels, {"seed": DEFAULT_SEED})
+            expected = splits_fingerprint(folds)
+            # Keep every fold non-empty: drop one subject from two different folds.
+            drop = []
+            seen = set()
+            for subject, fold in sorted(folds.items()):
+                if fold not in seen and folds[subject] is not None:
+                    seen.add(fold)
+                    if len(drop) < 2:
+                        drop.append(subject)
+            subset = {s: l for s, l in labels.items() if s not in drop}
+            with contextlib.redirect_stdout(io.StringIO()):
+                _, provenance = cross_validate.load_frozen_folds(path, subset)
+            self.assertEqual(provenance["fingerprint"], expected)
+            self.assertEqual(provenance["fingerprint_scope"], "file")
+            self.assertEqual(provenance["subjects_in_file"], len(folds))
+            self.assertEqual(provenance["subjects_used"], len(subset))

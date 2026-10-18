@@ -191,6 +191,12 @@ def load_frozen_folds(
     patient between folds.
     """
     frozen = load_splits(splits_path)
+    # The fingerprint must describe the FILE, not the subset that happened to
+    # produce windows: train_cnn cites the same file, and a filtered run must
+    # not appear to use a different protocol. Subjects without windows are
+    # dropped below, after the fingerprint is taken.
+    file_fingerprint = splits_fingerprint(frozen)
+    subjects_in_file = len(frozen)
     missing = sorted(set(labels) - set(frozen))
     if missing:
         raise SystemExit(
@@ -216,7 +222,10 @@ def load_frozen_folds(
         "kind": "frozen_splits_file",
         "path": str(splits_path),
         "n_folds": n_folds,
-        "fingerprint": splits_fingerprint(frozen),
+        "fingerprint": file_fingerprint,
+        "fingerprint_scope": "file",
+        "subjects_in_file": int(subjects_in_file),
+        "subjects_used": int(len(frozen)),
     }
 
 

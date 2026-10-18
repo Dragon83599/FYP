@@ -33,12 +33,18 @@ from hs_cnn import (
 from hs_features import design_bandpass_fir, filtfilt, iter_windows, read_wav_mono
 from hs_metrics import best_threshold, binary_metrics, bootstrap_ci
 from hs_segments import annotated_window_starts, load_segments
+#: Bumped whenever the cached provenance structure changes, so a cache written
+#: by an older schema is rebuilt instead of being trusted.
+CACHE_SCHEMA = 2
+
 from hs_splits import (
     DEFAULT_SEED,
     apply_frozen_split,
     frozen_split_cache_key,
     split_cache_key,
     split_cache_matches,
+    window_cache_key,
+    window_cache_matches,
 )
 
 
@@ -216,8 +222,15 @@ def build_cache(data_dir: Path, args: argparse.Namespace) -> tuple[dict, dict]:
             "record": np.asarray(bucket["record"]),
         }
     return result, {
+        "cache_schema": CACHE_SCHEMA,
         "skipped_unannotated": skipped_unannotated,
         "folds_source": folds_source,
+        "window_params": window_cache_key(
+            args.window_sec,
+            args.hop_sec,
+            args.max_windows_per_record,
+            args.window_selection,
+        ),
     }
 
 
@@ -449,14 +462,36 @@ def main() -> None:
     cache = None
     if cache_file.exists() and not args.rebuild_cache:
         loaded = load_saved_cache(data_dir)
-        recorded_split = loaded.get("_stats", {}).get("folds_source")
-        if split_cache_matches(recorded_split, requested_split):
+        stats_recorded = loaded.get("_stats", {})
+        recorded_split = stats_recorded.get("folds_source")
+        requested_window = window_cache_key(
+            args.window_sec,
+            args.hop_sec,
+            args.max_windows_per_record,
+            args.window_selection,
+        )
+        schema_ok = stats_recorded.get("cache_schema") == CACHE_SCHEMA
+        split_ok = schema_ok and split_cache_matches(recorded_split, requested_split)
+        window_ok = window_cache_matches(stats_recorded.get("window_params"), requested_window)
+        if schema_ok and split_ok and window_ok:
             cache = loaded
-        else:
+        elif not schema_ok:
+            print(
+                "[cache] cache schema is "
+                f"{stats_recorded.get('cache_schema')!r}, expected {CACHE_SCHEMA}; "
+                "rebuilding the window cache"
+            )
+        elif not split_ok:
             print(
                 "[cache] split configuration changed; rebuilding the window cache ("
                 + describe_split_change(recorded_split, requested_split)
                 + ")"
+            )
+        else:
+            print(
+                "[cache] window parameters changed; rebuilding the window cache "
+                f"(recorded={stats_recorded.get('window_params')}, "
+                f"requested={requested_window})"
             )
     if cache is None:
         cache, stats = build_cache(data_dir, args)
@@ -489,6 +524,10 @@ def main() -> None:
         "max_windows_per_record": args.max_windows_per_record,
         "window_selection": args.window_selection,
         "folds_source": cache.get("_stats", {}).get("folds_source", {"kind": "unknown"}),
+        "seeds": {
+            "training": int(args.seed),
+            "split": int(split_seed_for(args)),
+        },
         "min_annotated_fraction": args.min_annotated_fraction,
         "skipped_unannotated_windows": int(
             cache.get("_stats", {}).get("skipped_unannotated", -1)

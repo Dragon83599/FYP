@@ -540,7 +540,12 @@ def apply_frozen_split(
         "kind": "frozen_splits_file",
         "path": str(path),
         "fold": int(fold_index),
+        # Same scope as cross_validate: the fingerprint describes the FILE, so
+        # both scripts cite the same number for the same protocol.
         "fingerprint": splits_fingerprint(folds),
+        "fingerprint_scope": "file",
+        "subjects_in_file": int(len(folds)),
+        "subjects_used": int(len(labels)),
         "val_split": {
             "rule": "seed + fold_index",
             "seed": seed + fold_index,
@@ -635,3 +640,47 @@ def split_cache_matches(folds_source, expected: dict[str, object]) -> bool:
     """True only when recorded provenance describes exactly ``expected``."""
     key = split_cache_key(folds_source)
     return key is not None and key == expected
+
+
+#: Window-extraction parameters that change which windows a cache contains.
+#: They are deliberately NOT part of the split key: the split and the windowing
+#: are independent, and both must match for a cache to be reusable.
+WINDOW_CACHE_FIELDS = (
+    "window_sec",
+    "hop_sec",
+    "max_windows_per_record",
+    "window_selection",
+)
+
+
+def window_cache_key(
+    window_sec: float,
+    hop_sec: float,
+    max_windows_per_record: int,
+    window_selection: str,
+) -> dict[str, object]:
+    """Key describing the windowing configuration of a cached window set."""
+    return {
+        "window_sec": float(window_sec),
+        "hop_sec": float(hop_sec),
+        "max_windows_per_record": int(max_windows_per_record),
+        "window_selection": str(window_selection),
+    }
+
+
+def window_cache_matches(recorded, expected: dict[str, object]) -> bool:
+    """True only when recorded provenance carries exactly these window params.
+
+    A cache written before these fields existed returns False, so the first run
+    after this change rebuilds once instead of silently reusing windows built
+    with different parameters.
+    """
+    if not isinstance(recorded, dict):
+        return False
+    try:
+        normalised = {
+            field: type(expected[field])(recorded[field]) for field in WINDOW_CACHE_FIELDS
+        }
+    except (KeyError, TypeError, ValueError):
+        return False
+    return normalised == expected
