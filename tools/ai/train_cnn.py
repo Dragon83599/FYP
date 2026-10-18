@@ -46,6 +46,17 @@ from hs_splits import (
     window_cache_key,
     window_cache_matches,
 )
+# The calibration sampler and the ONNX size accounting live in ``requantize``
+# because that module is torch-free (and partly onnxruntime-free), so one
+# implementation is shared with the diagnostic sweep and can be unit-tested in
+# the NumPy-only CI. Importing it here adds no torch/ORT dependency.
+from requantize import (
+    DEFAULT_CALIBRATION_SEED,
+    DEFAULT_CALIBRATION_SIZE,
+    DEFAULT_PERCENTILE,
+    calibration_index,
+    model_size_bytes,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -102,6 +113,48 @@ def parse_args() -> argparse.Namespace:
         "given (cross_validate.py uses the same default). Ignored otherwise.",
     )
     parser.add_argument("--skip-onnx", action="store_true")
+    parser.add_argument(
+        "--calib-size",
+        type=int,
+        default=DEFAULT_CALIBRATION_SIZE,
+        help="Static-quantization calibration windows, drawn from the TRAIN split.",
+    )
+    parser.add_argument(
+        "--calibration-sampling",
+        choices=("random", "linspace"),
+        default="random",
+        help="How the calibration windows are chosen. 'random' is a seeded uniform "
+        "subsample (reproducible from --calib-seed and --fold); 'linspace' is the "
+        "pre-2026-10-19 behaviour kept so old reports can be reproduced.",
+    )
+    parser.add_argument(
+        "--calib-seed",
+        type=int,
+        default=DEFAULT_CALIBRATION_SEED,
+        help="Seed of the random calibration subsample. The fold is mixed in too, "
+        "so two folds never share one draw.",
+    )
+    parser.add_argument(
+        "--calib-activation",
+        choices=("int8", "quint8"),
+        default="int8",
+        help="Activation dtype for static quantization. 'int8' (symmetric QInt8) is "
+        "what ESP-DL/TFLite Micro integer kernels run and is the default; 'quint8' "
+        "reproduces the pre-2026-10-19 QUInt8 reports.",
+    )
+    parser.add_argument(
+        "--calib-method",
+        choices=("percentile", "minmax", "entropy"),
+        default="percentile",
+        help="Calibration method; 'minmax' reproduces the old reports.",
+    )
+    parser.add_argument(
+        "--calib-percentile",
+        type=float,
+        default=DEFAULT_PERCENTILE,
+        help="Percentile clipping for --calib-method percentile. ONNX Runtime's own "
+        "default is 99.999, which for a few hundred windows behaves like MinMax.",
+    )
     return parser.parse_args()
 
 
@@ -555,16 +608,61 @@ def main() -> None:
     torch.save(model.state_dict(), out_dir / "model.pt")
     if not args.skip_onnx:
         try:
+            input_length = cache["train"]["x"].shape[1]
             fp32_path = out_dir / "model-fp32.onnx"
-            export_onnx(model, fp32_path, input_length=cache["train"]["x"].shape[1])
-            fp32_latency = onnx_runtime_latency(fp32_path, cache["train"]["x"].shape[1])
+            export_onnx(model, fp32_path, input_length=input_length)
+            fp32_latency = onnx_runtime_latency(fp32_path, input_length)
             fp32_probabilities = onnx_predict(fp32_path, cache["test"]["x"])
-            calibration_size = min(200, len(cache["train"]["x"]))
-            indices = np.linspace(
-                0, len(cache["train"]["x"]) - 1, calibration_size
-            ).round().astype(int)
+
+            # Seeded calibration draw. The sampler is shared with
+            # tools/ai/requantize.py so a report's calibration set can be
+            # reproduced exactly from (seed, fold, size, sampling).
+            calibration_size = min(int(args.calib_size), len(cache["train"]["x"]))
+            calibration_indices = calibration_index(
+                calibration_size,
+                args.calibration_sampling,
+                len(cache["train"]["x"]),
+                int(args.calib_seed),
+                0,
+                fold=int(args.fold),
+            )
+            quantize_percentile = (
+                float(args.calib_percentile) if args.calib_method == "percentile" else None
+            )
+            settings = {
+                "format": "QOperator",
+                "activation_type": args.calib_activation,
+                "weight_type": "QInt8",
+                "weight_granularity": "per_channel",
+                "calibrate_method": args.calib_method,
+                "calibrate_percentile": quantize_percentile,
+                "calibration_size": int(calibration_size),
+                "calibration_sampling": args.calibration_sampling,
+                "calibration_seed": int(args.calib_seed),
+                "calibration_fold": int(args.fold),
+                "calibration_unique_subjects": int(
+                    len(set(cache["train"]["subject"][calibration_indices]))
+                ),
+                "calibration_unique_records": int(
+                    len(set(cache["train"]["record"][calibration_indices]))
+                ),
+            }
+            method_text = (
+                f"onnxruntime static {settings['format']}, "
+                f"{settings['weight_granularity']} {settings['weight_type']} weights, "
+                f"{settings['activation_type']} activations, "
+                f"{settings['calibrate_method']}"
+                + (f" {quantize_percentile:g}" if quantize_percentile is not None else "")
+                + f", n={settings['calibration_size']} {settings['calibration_sampling']}"
+            )
+            fp32_size = model_size_bytes(fp32_path)
             quantization = {
-                "fp32_onnx_bytes": fp32_path.stat().st_size,
+                # Model size = graph + external-data sidecar. Before 2026-10-19
+                # this key held only the .onnx file (37,717 B) and understated
+                # the FP32 model by the 162,752 B in model-fp32.onnx.data.
+                "fp32_onnx_bytes": fp32_size["total_bytes"],
+                "fp32_onnx_file_bytes": fp32_size["onnx_bytes"],
+                "fp32_onnx_external_data_bytes": fp32_size["external_data_bytes"],
                 "fp32_onnx_latency": fp32_latency,
                 "fp32_test_patient": patient_level(
                     fp32_probabilities,
@@ -572,28 +670,64 @@ def main() -> None:
                     cache["test"]["subject"],
                     evaluation["threshold"],
                 ),
+                "fp32_test_patient_at_0_5": patient_level(
+                    fp32_probabilities,
+                    cache["test"]["y"],
+                    cache["test"]["subject"],
+                    0.5,
+                ),
+                "settings": settings,
             }
             int8_path = out_dir / "model-int8.onnx"
             try:
                 quantize_onnx_static(
                     fp32_path,
                     int8_path,
-                    cache["train"]["x"][indices].astype(np.float32),
+                    cache["train"]["x"][calibration_indices].astype(np.float32),
+                    activation_type=args.calib_activation,
+                    calibrate_method=args.calib_method,
+                    percentile=float(args.calib_percentile),
                 )
                 int8_probabilities = onnx_predict(int8_path, cache["test"]["x"])
+                # The FP32 threshold is tuned on FP32 validation probabilities;
+                # quantization shifts the score distribution, so balanced
+                # accuracy at that threshold understates INT8 even when the
+                # ranking (AUROC) is intact. Re-derive it on INT8 validation.
+                int8_val_probabilities = onnx_predict(int8_path, cache["val"]["x"])
+                int8_threshold, int8_val_score = best_threshold(
+                    cache["val"]["y"], int8_val_probabilities
+                )
+                int8_size = model_size_bytes(int8_path)
                 quantization.update(
                     {
-                        "int8_onnx_bytes": int8_path.stat().st_size,
-                        "int8_onnx_latency": onnx_runtime_latency(
-                            int8_path, cache["train"]["x"].shape[1]
-                        ),
+                        "int8_onnx_bytes": int8_size["total_bytes"],
+                        "int8_onnx_file_bytes": int8_size["onnx_bytes"],
+                        "int8_onnx_external_data_bytes": int8_size["external_data_bytes"],
+                        "int8_onnx_latency": onnx_runtime_latency(int8_path, input_length),
+                        # Headline number used by the published 5-fold tables: INT8
+                        # scores compared at the FP32-derived threshold.
                         "int8_test_patient": patient_level(
                             int8_probabilities,
                             cache["test"]["y"],
                             cache["test"]["subject"],
                             evaluation["threshold"],
                         ),
-                        "quantization_method": "onnxruntime static QOperator, per-channel QInt8 weights",
+                        "int8_threshold": float(int8_threshold),
+                        "int8_val_balanced_accuracy_at_int8_threshold": float(int8_val_score),
+                        "int8_test_patient_at_int8_threshold": patient_level(
+                            int8_probabilities,
+                            cache["test"]["y"],
+                            cache["test"]["subject"],
+                            int8_threshold,
+                        ),
+                        "int8_test_patient_at_0_5": patient_level(
+                            int8_probabilities,
+                            cache["test"]["y"],
+                            cache["test"]["subject"],
+                            0.5,
+                        ),
+                        "quantization_method": method_text,
+                        "settings": settings,
                     }
                 )
             except Exception as error:  # noqa: BLE001 - static quantization is optional
@@ -652,11 +786,46 @@ def write_markdown(path: Path, report: dict) -> None:
     if report.get("quantization"):
         quantization = report["quantization"]
         if "int8_onnx_bytes" in quantization:
-            lines.append(f"- INT8 ONNX file: {quantization['int8_onnx_bytes'] / 1024:.1f} KiB")
+            settings = quantization.get("settings", {})
+            lines.append(
+                f"- FP32 model (graph + external data): "
+                f"{quantization.get('fp32_onnx_bytes', 0) / 1024:.1f} KiB"
+            )
+            lines.append(
+                f"- INT8 model (graph + external data): "
+                f"{quantization['int8_onnx_bytes'] / 1024:.1f} KiB"
+            )
+            if settings:
+                lines.append(
+                    f"- Quantizer: {quantization.get('quantization_method', 'n/a')}; "
+                    f"calibration = {settings.get('calibration_size')} "
+                    f"{settings.get('calibration_sampling')} windows, "
+                    f"seed {settings.get('calibration_seed')}, fold "
+                    f"{settings.get('calibration_fold')} "
+                    f"({settings.get('calibration_unique_subjects')} subjects / "
+                    f"{settings.get('calibration_unique_records')} recordings)"
+                )
             lines.append(
                 f"- PC INT8 ONNX latency: mean {quantization['int8_onnx_latency']['mean_ms']:.2f} ms, "
                 f"P95 {quantization['int8_onnx_latency']['p95_ms']:.2f} ms"
             )
+            if "int8_test_patient" in quantization:
+                fp32_auroc = quantization["fp32_test_patient"]["auroc"]
+                int8_auroc = quantization["int8_test_patient"]["auroc"]
+                lines.append(
+                    f"- Patient AUROC, FP32 {fp32_auroc:.4f} vs INT8 {int8_auroc:.4f} "
+                    f"(drop {fp32_auroc - int8_auroc:+.4f}) at the FP32 validation threshold"
+                )
+                own = quantization.get("int8_test_patient_at_int8_threshold")
+                if own is not None:
+                    lines.append(
+                        f"- INT8 at its own threshold {quantization['int8_threshold']:.4f}: "
+                        f"AUROC {own['auroc']:.4f}, balanced accuracy "
+                        f"{own['balanced_accuracy']:.3f} "
+                        f"(FP32 balanced accuracy {quantization['fp32_test_patient']['balanced_accuracy']:.3f} "
+                        f"at the FP32 threshold; INT8 at the FP32 threshold "
+                        f"{quantization['int8_test_patient']['balanced_accuracy']:.3f})"
+                    )
         if "quantization_error" in quantization:
             lines.append(f"- Static quantization error: {quantization['quantization_error']}")
         if "export_error" in quantization:
@@ -689,8 +858,14 @@ def write_budget(path: Path, report: dict) -> None:
     ]
     if "int8_onnx_bytes" in quantization:
         lines.append(
-            f"| INT8 ONNX 文件 | {quantization['int8_onnx_bytes'] / 1024:.1f} KiB | 待目标板验证 | ONNX Runtime 静态量化 |"
+            f"| INT8 模型（图+外部数据） | {quantization['int8_onnx_bytes'] / 1024:.1f} KiB | "
+            f"待目标板验证 | ONNX Runtime 静态量化（{quantization.get('settings', {}).get('activation_type', 'n/a')} 激活） |"
         )
+        if "fp32_onnx_bytes" in quantization:
+            lines.append(
+                f"| FP32 模型（图+外部数据） | {quantization['fp32_onnx_bytes'] / 1024:.1f} KiB | "
+                f"- | ONNX 导出 |"
+            )
     lines.extend(
         [
             "| 目标板平均推理时间 | 待实测 | - | ESP32-S3/P4 或 STM32N6 |",

@@ -309,14 +309,57 @@ def quantize_onnx_static(
     input_path: Path,
     output_path: Path,
     calibration_windows: np.ndarray,
+    *,
+    activation_type: str = "int8",
+    per_channel: bool = True,
+    calibrate_method: str = "percentile",
+    percentile: float = 99.99,
 ) -> None:
-    """Per-channel static int8 quantization using ONNX Runtime."""
+    """Per-channel static int8 quantization using ONNX Runtime.
+
+    The keyword defaults are the corrected recipe (2026-10-19). They are also
+    what an MCU integer kernel can run, which is why they are the default rather
+    than ONNX Runtime's:
+
+    * ``activation_type="int8"`` - symmetric ``QInt8`` activations. ORT's
+      ``QUInt8`` default is not offered by ESP-DL / TFLite Micro integer kernels,
+      and it costs accuracy here: over the five frozen folds the mean patient
+      AUROC drop was 0.0937 with ``QUInt8`` versus 0.0532 with ``QInt8`` on the
+      same MinMax/linspace/200 configuration (``data/reports/int8-calibration-sweep``).
+    * ``calibrate_method="percentile"`` with ``percentile=99.99`` - MinMax lets
+      one outlier window stretch the activation range. Note ORT's own
+      ``CalibPercentile`` default is 99.999, which for a few hundred windows is
+      numerically identical to MinMax, so the percentile has to be passed
+      explicitly.
+    * ``per_channel=True`` - per-channel weight scales, unchanged.
+
+    The old three-argument call still works and simply uses these defaults; pass
+    ``activation_type="quint8"`` / ``calibrate_method="minmax"`` to reproduce the
+    pre-2026-10-19 numbers (``QUInt8`` + MinMax + ``np.linspace`` calibration).
+
+    ONNX Runtime is imported lazily so this module's import surface (and the
+    NumPy-only CI) is unaffected.
+    """
     from onnxruntime.quantization import (
         CalibrationDataReader,
+        CalibrationMethod,
         QuantFormat,
         QuantType,
         quantize_static,
     )
+
+    activation = {
+        "int8": QuantType.QInt8,
+        "quint8": QuantType.QUInt8,
+    }[activation_type]
+    method = {
+        "percentile": CalibrationMethod.Percentile,
+        "minmax": CalibrationMethod.MinMax,
+        "entropy": CalibrationMethod.Entropy,
+    }[calibrate_method]
+    extra_options = None
+    if method is CalibrationMethod.Percentile:
+        extra_options = {"CalibPercentile": float(percentile)}
 
     class Reader(CalibrationDataReader):
         def __init__(self, windows: np.ndarray) -> None:
@@ -337,7 +380,9 @@ def quantize_onnx_static(
         model_output=str(output_path),
         calibration_data_reader=Reader(calibration_windows),
         quant_format=QuantFormat.QOperator,
-        per_channel=True,
+        per_channel=per_channel,
         weight_type=QuantType.QInt8,
-        activation_type=QuantType.QUInt8,
+        activation_type=activation,
+        calibrate_method=method,
+        extra_options=extra_options,
     )
