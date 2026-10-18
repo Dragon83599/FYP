@@ -20,6 +20,7 @@
 - `docs/progress-2026-10-08.md`：10 月 7 日至 8 日的协议、AI、学习和决策进度摘要。
 - `docs/progress-2026-10-17.md`：10 月 17 日的数据集审计与决策进度。
 - `docs/progress-2026-10-18.md`：链路 A 的 GATT profile 和 S1/S2 事件级评估进度。
+- `docs/handoff-2026-10-19.md`：真实数据评估、容量研究、INT8 量化后的交接状态。
 - `docs/s1s2-detector-baseline.md`：S1/S2 DSP 检测器的方法、合成数据实测与失败模式。
 - `docs/mvp-output-contract.md`：MVP 输出契约（波形/杂音/心率/ S1-S2 各自的证据与措辞要求）。
 - `docs/host-resource-budget.md`：主机平台资源预算（ADR-006 的量化输入）。
