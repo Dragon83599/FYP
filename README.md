@@ -23,6 +23,8 @@
 - `docs/s1s2-detector-baseline.md`：S1/S2 DSP 检测器的方法、合成数据实测与失败模式。
 - `docs/mvp-output-contract.md`：MVP 输出契约（波形/杂音/心率/ S1-S2 各自的证据与措辞要求）。
 - `docs/host-resource-budget.md`：主机平台资源预算（ADR-006 的量化输入）。
+- `docs/fyp-scope-and-sufficiency.md`：范围契约（必须/应该/不做）与答辩检查表。
+- `docs/edge-ai-primer.md`：边缘 AI 基础速查（用本项目数字讲参数量、MACs、INT8、内存层次）。
 - `docs/ai-model-resource-budget-guide.md`：从数据、训练、量化到目标板资源预算的入门指南。
 - `docs/ai-baseline-plan.md`：第一版心音 AI 的候选方案对比、实测预算和验证计划。
 - `docs/phase0-interface-freeze.md`：v0.2 接口基线、决策理由、测试向量和验收清单。
