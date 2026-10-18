@@ -17,6 +17,11 @@ apart. Only the feature front-end differs (``hs_mfcc`` instead of
 explicitly; the report then records the split fingerprint, which is what makes
 the "same patient-level protocol" claim checkable instead of assumed.
 
+``--dump-probabilities PATH`` writes the patient-level probabilities behind the
+metrics (one row per patient and split: ``fold,split,subject_id,label,probability``)
+for ``tools/ai/workpoint_analysis.py``; without the flag nothing is written and
+``report.json`` stays byte-identical.
+
 Usage (synthetic smoke test, numbers are pipeline validation only):
 
     python tools/ai/synthetic_pcg.py --out-dir /tmp/mfcc-demo --subjects 12
@@ -36,9 +41,11 @@ from cross_validate import (
     indices_for,
     load_rows,
     patient_probabilities,
+    patient_probability_rows,
     split_train_val,
     stratified_folds,
     subject_labels,
+    write_probability_dump,
 )
 from hs_features import design_bandpass_fir, filtfilt, iter_windows, read_wav_mono
 from hs_metrics import best_threshold, binary_metrics, bootstrap_ci
@@ -90,6 +97,19 @@ def parse_args() -> argparse.Namespace:
             "arm can be proven to use the same patient folds as the CNN and log-mel "
             "arms. Requires tools/ai/hs_splits.py; default keeps the seed-derived "
             "folds of tools/ai/cross_validate.py."
+        ),
+    )
+    parser.add_argument(
+        "--dump-probabilities",
+        default="",
+        metavar="PATH",
+        help=(
+            "Optional CSV path. For every fold write one row per patient with "
+            "columns fold,split,subject_id,label,probability, where split is "
+            "'val' or 'test'. The val rows are the only rows a threshold or a "
+            "calibration map may be fitted on; the test rows are for evaluation "
+            "only. When the flag is absent nothing changes and report.json stays "
+            "byte-identical."
         ),
     )
     # MFCC front-end
@@ -342,6 +362,8 @@ def main() -> None:
     pooled_probability: list[float] = []
     pooled_truth: list[int] = []
     per_fold: list[dict] = []
+    dump_path = Path(args.dump_probabilities) if args.dump_probabilities else None
+    probability_rows: list[dict] = []
     max_train_test_overlap = 0
     max_val_test_overlap = 0
 
@@ -372,6 +394,19 @@ def main() -> None:
         ).fit(scaler.transform(x[train_idx]), y[train_idx])
         val_probability = model.predict_proba(scaler.transform(x[val_idx]))
         test_probability = model.predict_proba(scaler.transform(x[test_idx]))
+
+        if dump_path is not None:
+            # Only computed when asked: the default path stays byte-identical.
+            probability_rows.extend(
+                patient_probability_rows(
+                    fold_index, "val", y[val_idx], val_probability, subjects[val_idx]
+                )
+            )
+            probability_rows.extend(
+                patient_probability_rows(
+                    fold_index, "test", y[test_idx], test_probability, subjects[test_idx]
+                )
+            )
 
         threshold, val_score = best_threshold(y[val_idx], val_probability)
         window_metrics = binary_metrics(y[test_idx], test_probability, threshold)
@@ -407,6 +442,14 @@ def main() -> None:
             f"patient_auroc={patient_metrics['auroc']:.3f} "
             f"patient_ba={patient_metrics['balanced_accuracy']:.3f} "
             f"confusion={patient_metrics['confusion']}"
+        )
+
+    if dump_path is not None:
+        write_probability_dump(dump_path, probability_rows)
+        n_val = sum(1 for row in probability_rows if row["split"] == "val")
+        print(
+            f"[mfcc-cv] wrote {len(probability_rows)} probability rows "
+            f"({n_val} val, {len(probability_rows) - n_val} test) to {dump_path}"
         )
 
     pooled_truth_array = np.asarray(pooled_truth, dtype=int)

@@ -12,6 +12,14 @@ By default the folds are re-derived from ``--seed`` (legacy behaviour). Pass
 ``--splits-file`` to use a frozen ``splits.csv`` from
 ``tools/ai/freeze_splits.py`` instead; the report then records the split
 fingerprint so two runs can be proven to use the same patient folds.
+
+The reports store metrics only, so ``--dump-probabilities PATH`` writes the
+patient-level probabilities behind them: one row per patient and split
+(``fold,split,subject_id,label,probability``, ``split`` = ``val`` or ``test``).
+That is what ``tools/ai/workpoint_analysis.py`` needs to fit a calibration map
+and a clinically stated operating point on the validation rows and evaluate it
+once on the test rows.  Without the flag nothing is written and ``report.json``
+stays byte-identical.
 """
 
 from __future__ import annotations
@@ -62,6 +70,19 @@ def parse_args() -> argparse.Namespace:
             "the folds are read from this file (and its sha256 fingerprint is "
             "recorded in the report) instead of being derived from --seed. "
             "Default None keeps the legacy seed-derived folds."
+        ),
+    )
+    parser.add_argument(
+        "--dump-probabilities",
+        default="",
+        metavar="PATH",
+        help=(
+            "Optional CSV path. For every fold write one row per patient with "
+            "columns fold,split,subject_id,label,probability, where split is "
+            "'val' or 'test'. The val rows are the only rows a threshold or a "
+            "calibration map may be fitted on; the test rows are for evaluation "
+            "only. When the flag is absent nothing changes and report.json stays "
+            "byte-identical."
         ),
     )
     # logistic regression
@@ -300,6 +321,86 @@ def evaluate_split(
     return window_metrics, patient_metrics
 
 
+#: Columns of the ``--dump-probabilities`` CSV, in file order.
+PROBABILITY_FIELDS = ("fold", "split", "subject_id", "label", "probability")
+
+#: Order of the ``split`` column: validation rows first, then test rows.
+PROBABILITY_SPLIT_ORDER = ("val", "test")
+
+
+def patient_probability_rows(
+    fold_index: int,
+    split: str,
+    y: np.ndarray,
+    probability: np.ndarray,
+    subjects: np.ndarray,
+) -> list[dict]:
+    """One dump row per patient of ``split`` in fold ``fold_index``.
+
+    The probability is the same mean-of-window patient aggregate that the
+    reported patient-level metrics use, so every number in ``report.json`` can
+    be recomputed from the dump.  ``split`` is ``"val"`` (the rows a threshold
+    or a calibration map may be fitted on) or ``"test"`` (evaluation only).
+    """
+    truth, aggregated = patient_probabilities(probability, y, subjects)
+    ids = sorted({str(subject) for subject in subjects})
+    if len(ids) != len(truth):  # pragma: no cover - guards a helper change
+        raise SystemExit(
+            f"patient aggregation returned {len(truth)} labels for {len(ids)} patients"
+        )
+    return [
+        {
+            "fold": int(fold_index),
+            "split": str(split),
+            "subject_id": subject,
+            "label": int(label),
+            "probability": float(value),
+        }
+        for subject, label, value in zip(ids, truth, aggregated)
+    ]
+
+
+def write_probability_dump(path, rows: list[dict]) -> Path:
+    """Write the ``--dump-probabilities`` CSV: header plus sorted rows.
+
+    The file is meant to be diffable and reproducible: rows are sorted by
+    ``(fold, split order, subject_id)`` and each probability is written with
+    ``repr``, which round-trips a float64 exactly.  The dump is deliberately
+    *not* recorded in ``report.json``, so a run without the flag produces a
+    byte-identical report.
+    """
+    path = Path(path)
+    rank = {name: index for index, name in enumerate(PROBABILITY_SPLIT_ORDER)}
+    unknown = sorted({str(row["split"]) for row in rows} - set(rank))
+    if unknown:
+        raise ValueError(
+            f"unknown split value(s) {unknown}; expected {list(PROBABILITY_SPLIT_ORDER)}"
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ordered = sorted(
+        rows,
+        key=lambda row: (
+            int(row["fold"]),
+            rank[str(row["split"])],
+            str(row["subject_id"]),
+        ),
+    )
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle, lineterminator="\n")
+        writer.writerow(PROBABILITY_FIELDS)
+        for row in ordered:
+            writer.writerow(
+                [
+                    int(row["fold"]),
+                    str(row["split"]),
+                    str(row["subject_id"]),
+                    int(row["label"]),
+                    repr(float(row["probability"])),
+                ]
+            )
+    return path
+
+
 def cnn_args(args: argparse.Namespace) -> types.SimpleNamespace:
     return types.SimpleNamespace(
         epochs=args.cnn_epochs,
@@ -337,6 +438,8 @@ def main() -> None:
     pooled_probability: list[float] = []
     pooled_truth: list[int] = []
     per_fold: list[dict] = []
+    dump_path = Path(args.dump_probabilities) if args.dump_probabilities else None
+    probability_rows: list[dict] = []
 
     for fold_index, test_subjects in enumerate(folds):
         pool = set(labels) - test_subjects
@@ -382,6 +485,27 @@ def main() -> None:
             val_probability = predict(model, dataset["x"][val_idx])
             test_probability = predict(model, dataset["x"][test_idx])
 
+        if dump_path is not None:
+            # Only computed when asked: the default path stays byte-identical.
+            probability_rows.extend(
+                patient_probability_rows(
+                    fold_index,
+                    "val",
+                    dataset["y"][val_idx],
+                    val_probability,
+                    dataset["subject"][val_idx],
+                )
+            )
+            probability_rows.extend(
+                patient_probability_rows(
+                    fold_index,
+                    "test",
+                    dataset["y"][test_idx],
+                    test_probability,
+                    dataset["subject"][test_idx],
+                )
+            )
+
         threshold, val_score = best_threshold(
             dataset["y"][val_idx], val_probability
         )
@@ -415,6 +539,14 @@ def main() -> None:
             f"window_auroc={window_metrics['auroc']:.3f} "
             f"patient_auroc={patient_metrics['auroc']:.3f} "
             f"patient_ba={patient_metrics['balanced_accuracy']:.3f}"
+        )
+
+    if dump_path is not None:
+        write_probability_dump(dump_path, probability_rows)
+        n_val = sum(1 for row in probability_rows if row["split"] == "val")
+        print(
+            f"[cv] wrote {len(probability_rows)} probability rows "
+            f"({n_val} val, {len(probability_rows) - n_val} test) to {dump_path}"
         )
 
     def aggregate(key: str, field: str) -> dict:
