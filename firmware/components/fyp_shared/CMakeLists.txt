@@ -21,12 +21,22 @@ idf_component_register(
         "${FYP_SHARED_DIR}/src/audio_protocol.c"
         "${FYP_SHARED_DIR}/src/link_a_protocol.c"
         "${FYP_SHARED_DIR}/src/host_pipeline.c"
+        "${FYP_SHARED_DIR}/src/hr_detector.c"
     INCLUDE_DIRS
         "${FYP_SHARED_DIR}/include"
 )
 
-# The shared library is integer-only and allocation-free by design (ADR-014).
+# Allocation-free by design: no malloc, no VLA, no static mutable state.
 # -Wall -Wextra -Wpedantic mirrors the PC build flags in the root CMakeLists.txt
 # so firmware and PC builds warn about the same things. -Werror is deliberately
 # not used for third-party/shared code.
+#
+# Arithmetic is mixed on purpose:
+#   - audio_protocol.c / link_a_protocol.c / host_pipeline.c are integer-only
+#     (ADR-014's "no runtime floating point" rule, scoped to the data path);
+#   - hr_detector.c is float32 by design (hr_detector.h D8): the ESP32-S3 has a
+#     single-precision FPU, and the 20-85 Hz zero-phase band-pass is 2.3 MMAC per
+#     2 s window, so Q15 would need 64-bit accumulators and hand-tuned scaling
+#     for the same dynamic range. This is a documented deviation, not drift:
+#     the data path itself still contains no runtime floating point.
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Wpedantic)

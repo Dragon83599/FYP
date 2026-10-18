@@ -618,3 +618,18 @@ ADR-008 验收条件：
 | 验证 | `ctest` 4/4；`./build/test_hr_detector --fixture data/reports/hr-fixture-circor.csv` 复跑对照；上板后实测 |
 | 未验证 | ESP32-S3 上的实际时延、栈占用与功耗；本轮只有 PC 数据 |
 | 受影响文件 | `shared/include/hr_detector.h`、`shared/src/hr_detector.c`、`tests/test_hr_detector.c`、`tools/ai/dump_hr_fixture.py`、`CMakeLists.txt`、`firmware/**`（接入中） |
+
+### ADR-016 心率接入固件（2026-10-18）
+
+| 项目 | 内容 |
+| --- | --- |
+| 变更 | `firmware/main/app_main.c` 接入 `hr_detector`：静态分配 `hr_detector_t` + `float s_hr_work[8774]`；每窗 `push` → `estimate` → 显示 `HR ~<bpm>`，无效时 `HR --`，并固定渲染一行 `estimated, not a diagnosis`；杂音行保持不变 |
+| 资源实测（`idf.py size`，本机复核） | DIRAM **134,531 → 169,979**（39.36% → **49.74%**，+35,448 B = 35,096 工作缓冲 + 352 结构体，与 `.bss` 增量完全一致）；Flash +7,132 B；**IRAM +0**（仍 16,384/16,384，HR 代码进 IROM、系数表进 DROM） |
+| 栈 | `APP_AI_TASK_STACK_BYTES` 4096 → **8192**（静态 `-fstack-usage` 测得 push 1216 B / estimate 448 B / quantile 320 B，Xtensa 帧布局与 x86-64 不同，故留余量） |
+| 会话重置 | 不修改 BLE 回调：消费任务每窗读取 `host_pipeline` 的 mutex 保护计数 `stats.session_restarts`，变化时在**消费任务内**调用 `hr_detector_reset()`。检测器只被 `ai_display_task` 访问，NimBLE 任务不持有其指针 |
+| 额外保护（超出任务书） | ① **断流重置**：任一步没有完整窗即重置，避免绝对时间游标跨缺口；② **陈旧窗防护**：探头断流后环形缓冲仍返回同一段 2 s，重复推送会把旧峰当成新事件、伪造约 60 bpm，故用 `frames_ok` 的有符号差判断是否推进，未推进则重置并显示 `HR --` |
+| 时序契约 | 用两个 `_Static_assert` 把"2 s 窗 / 1 s 步进 = hop n/2"钉死在编译期；步进若变，需改用 `hr_detector_push_hop()` |
+| 验证 | `idf.py build` 通过（我本机重跑）；全量构建 **0 warning**；`idf.py size` 数字与智能体报告一致；`ctest -R hr_detector` 通过 |
+| 未验证 | 无硬件：真实心率精度、S3 上时延、运行时栈高水位、堆余量、BLE/MTU/PHY、屏幕渲染。DIRAM 静态余量 171,781 B，但 NimBLE 与各任务栈的运行时占用未测 |
+| 风险 | DIRAM 从 39% 升到 50%，余量仍够但已不可忽视；显示层仍是 stub，`HR ~` 只在日志中可见 |
+| 受影响文件 | `firmware/main/app_main.c`、`firmware/components/fyp_shared/CMakeLists.txt`、`firmware/README.md` |
