@@ -107,7 +107,10 @@ extern "C" {
  *     (81.9 % vs 79.3 %), i.e. that difference is subset noise. RUNNING_MAX is
  *     rejected outright (worse on both metrics). The 95 % agreement target is
  *     NOT met - see D13 for the diagnosis and the measurements that explain
- *     where the residual difference comes from.
+ *     where the residual difference comes from. A third candidate (a streaming
+ *     4 s floor that reproduces Python's statistic more closely) was added and
+ *     measured later: see D14 - it made both metrics worse and its code was
+ *     removed, so there are exactly two modes.
  *
  * D11. Overlapping windows: the firmware steps a 2 s window every 1 s, so each
  *     sample is analysed twice. Two rules de-duplicate events:
@@ -175,6 +178,11 @@ extern "C" {
  *         i.e. the disagreement is not a regression: Python loses events where
  *         its 4 s/whole-recording threshold starves a quiet but annotated
  *         section, and the 2 s local threshold does not.
+ *       - The obvious repair - a streaming 4 s floor that matches Python's
+ *         statistic more closely - was implemented and measured on the full
+ *         corpus in D14 and made both metrics worse (agreement -0.9 to
+ *         -2.0 points, reference MAE +0.7 to +1.1 bpm). The residual is
+ *         therefore NOT the 2 s vs 4 s floor span; D14 lists what is left.
  *     Two product-relevant measurements on the same corpus:
  *       - the same estimator over only the newest 32 events (the size of the
  *         history here) but still annotation-masked: 67.9 % within +-2 bpm of
@@ -184,6 +192,67 @@ extern "C" {
  *         of Python. The annotation mask is worth more than the history depth,
  *         so the firmware number must not be quoted from the 1.19 bpm median
  *         of the offline report.
+ *
+ * D14. Candidate D - streaming 4 s noise floor: IMPLEMENTED, MEASURED ON THE
+ *     FULL CORPUS, REJECTED, CODE REMOVED.
+ *     ADR-014 left the 4 s block median as the improvement path, and D10
+ *     approximated it with the median of one 2 s window. Candidate D was built
+ *     as ADR-014 proposed: keep a reduced-rate history of the envelope (one
+ *     sample per 4000 / rate input samples, i.e. 100 floats at 4 s / 25 Hz and
+ *     200 at 4 s / 50 Hz), append only the part of each window the previous
+ *     push did not cover (the same `first_new` rule D11 uses for events, so the
+ *     2 s / 1 s stepping cannot count a sample twice), and take the median of
+ *     the newest noise_history_ms * rate / 1000 entries with the same two-level
+ *     histogram as D10. It was selectable through the config (history length
+ *     and sampling rate) and cost 800 B of .bss (sizeof(hr_detector_t) 360 ->
+ *     1,184 B on x86-64); the work buffer and the init signature were
+ *     unchanged. It is gone now - see the decision. The table below is the
+ *     record, so nobody needs to rebuild it.
+ *
+ *     MEASURED (E4, CirCor, full fixture = 3152 recordings, 3145-3150 usable;
+ *     control = the pre-D14 default; `agreement` = C vs Python within +-2 bpm,
+ *     `ref` = C vs the CirCor annotation, `dev32` = device context (newest 32
+ *     events, no annotation mask, vs ref)):
+ *       mode              py MAE  agreement  within+-5  ref MAE  dev32
+ *       window(2s) ctrl     2.82     79.2%     89.5%      6.14    8.14
+ *       stream(3s@25Hz)     2.79     77.7%     89.4%      6.93    8.39
+ *       stream(3s@50Hz)     2.67     78.3%     89.4%      6.83    8.28
+ *       stream(4s@25Hz)     3.06     77.2%     88.4%      7.17    8.19
+ *       stream(4s@50Hz)     2.85     78.2%     88.8%      7.21    8.40
+ *     DECISION: rejected, and the code was removed instead of kept as an
+ *     opt-in mode - a mode that measured worse is dead code, and the firmware
+ *     DIRAM margin (docs/host-resource-budget.md) cannot pay 800 B for it. The
+ *     2 s window mode was the default before the experiment and stayed the
+ *     default throughout; no measurement below was produced with a worse
+ *     default in place.
+ *       - It does not close the gap. Agreement falls 0.9-2.0 points (the
+ *         pre-registered target was >= 90 %) and the C-vs-reference MAE
+ *         regresses 0.69-1.07 bpm against a budget of +0.30 (i.e. <= 6.44).
+ *         Both acceptance criteria fail.
+ *       - At a fixed envelope rate the degradation is monotone in the history
+ *         length (25 Hz: 2 s 79.2 % / 6.14 -> 3 s 77.7 % / 6.93 -> 4 s
+ *         77.2 % / 7.17; 50 Hz: 3 s 78.3 % / 6.83 -> 4 s 78.2 % / 7.21), so the
+ *         longer memory is the cause, not one unlucky setting.
+ *       - The direction matches D13: Python's 4 s/whole-recording threshold
+ *         starves quiet but annotated sections, which is why the 2 s window
+ *         mode is *closer to the annotation* than Python. Reproducing the 4 s
+ *         floor more faithfully imports that error.
+ *       - SUBSET-NOISE TRAP - do not fall for it again. A 300-recording
+ *         pre-run showed the opposite sign (+2.0 points for 4 s @ 25 Hz:
+ *         81.3 % vs 79.3 %; ref MAE 7.80 vs 6.53), and a 200-recording run
+ *         reproduced the same illusion (79-82.5 % vs 77.0 %; ref MAE 7.26-8.13
+ *         vs 6.25). The full corpus reversed both. The BLEND pre-run in D10
+ *         was the same mistake. Never size a threshold statistic on a subset
+ *         of CirCor.
+ *       - Therefore the residual C-vs-Python disagreement is NOT the 2 s vs 4 s
+ *         floor span. What remains unmatched is the recording-wide p99 (still
+ *         per-window here) and the non-causal alignment of Python's block
+ *         median (a sample at the start of a block sees up to 4 s into the
+ *         future), which no causal streaming implementation can reproduce.
+ *         Those two are the things a future attempt should target.
+ *     Note for docs/engineering-decision-register.md ADR-014: its candidate-D
+ *     row ("4 s block median + whole-recording p99, not implemented") is
+ *     superseded by this section; docs/ is outside this change's scope.
  *
  * Public API (see the declarations below):
  *   hr_detector_init      - bind caller storage + optional config
