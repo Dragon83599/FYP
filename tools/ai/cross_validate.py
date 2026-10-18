@@ -6,7 +6,16 @@ subjects are split into a training set and a small validation set used only to
 choose the decision threshold. Supported models:
 
 - ``logreg``: log-mel summary features + L2 logistic regression (NumPy).
-- ``cnn``: the small 1D CNN trained on raw windows (PyTorch, CPU).
+- ``cnn`` (alias ``small``): the small 1D CNN trained on raw windows (PyTorch,
+  CPU).  This is the frozen 41,105-parameter baseline; its code path is
+  unchanged.
+- ``resnet`` / ``tcn``: the larger architectures of the capacity experiment in
+  ``tools/ai/large_model_experiment.py``, built by ``hs_cnn.build_model`` and
+  trained with that experiment's copy of the baseline recipe (same folds, same
+  hyper-parameters, only the architecture changes).  Those two arms exist to
+  answer "would a 5-11x larger model buy patient-level accuracy on this data?".
+  Use ``tools/ai/large_model_experiment.py`` rather than this script to get the
+  capacity comparison report; ``--model resnet`` here is for a single arm.
 
 By default the folds are re-derived from ``--seed`` (legacy behaviour). Pass
 ``--splits-file`` to use a frozen ``splits.csv`` from
@@ -46,13 +55,33 @@ from hs_metrics import best_threshold, binary_metrics, bootstrap_ci
 from hs_models import LogisticRegression, StandardScaler
 from hs_segments import annotated_window_starts, load_segments
 from hs_splits import fold_sets, load_splits, splits_fingerprint, validate_splits
+from large_model_experiment import (
+    ARCHITECTURE_SPECS,
+    CONV_ARCHITECTURES,
+    SMALL_ALIASES,
+    architecture_budget,
+)
+
+#: ``--model`` values.  ``cnn`` is the frozen small-CNN path (unchanged);
+#: ``small`` is the same model under the capacity experiment's name; the other
+#: conv names come from ``large_model_experiment.ARCHITECTURE_SPECS``.
+MODEL_CHOICES = ("logreg", "cnn") + tuple(CONV_ARCHITECTURES)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", default="data/processed/circor")
     parser.add_argument("--out-dir", default="data/reports/circor-cv-logreg")
-    parser.add_argument("--model", choices=("logreg", "cnn"), default="logreg")
+    parser.add_argument(
+        "--model",
+        choices=MODEL_CHOICES,
+        default="logreg",
+        help=(
+            "logreg (NumPy), cnn/small (the frozen 41,105-parameter Small1DCNN "
+            "baseline), resnet/tcn (the capacity-experiment architectures from "
+            "large_model_experiment.py, same recipe, only capacity differs)."
+        ),
+    )
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--window-sec", type=float, default=2.0)
     parser.add_argument("--hop-sec", type=float, default=1.0)
@@ -401,6 +430,27 @@ def write_probability_dump(path, rows: list[dict]) -> Path:
     return path
 
 
+def _fit_windows_model(cache: dict, args: argparse.Namespace) -> tuple:
+    """Fit the raw-window torch model named by ``--model``.
+
+    ``cnn``/``small`` keep the historical ``train_cnn.train_model`` path (it
+    hard-codes ``Small1DCNN``) so the default report stays byte-identical.  The
+    capacity-experiment names delegate to
+    ``large_model_experiment.train_architecture``, which is the same recipe with
+    ``hs_cnn.build_model(args.model)`` as the only difference; both share the
+    same validation-based early stopping and threshold selection.
+    """
+    if args.model in SMALL_ALIASES:
+        from train_cnn import train_model
+
+        return train_model(cache, cnn_args(args))
+    if args.model not in ARCHITECTURE_SPECS:
+        raise SystemExit(f"unknown --model {args.model!r}")
+    from large_model_experiment import train_architecture
+
+    return train_architecture(cache, cnn_args(args), architecture=args.model)
+
+
 def cnn_args(args: argparse.Namespace) -> types.SimpleNamespace:
     return types.SimpleNamespace(
         epochs=args.cnn_epochs,
@@ -465,7 +515,7 @@ def main() -> None:
             val_probability = model.predict_proba(scaler.transform(dataset["x"][val_idx]))
             test_probability = model.predict_proba(scaler.transform(dataset["x"][test_idx]))
         else:
-            from train_cnn import predict, train_model
+            from train_cnn import predict
 
             cache = {
                 "train": {
@@ -481,7 +531,7 @@ def main() -> None:
                     "record": dataset["record"][val_idx],
                 },
             }
-            model, _ = train_model(cache, cnn_args(args))
+            model, _ = _fit_windows_model(cache, args)
             val_probability = predict(model, dataset["x"][val_idx])
             test_probability = predict(model, dataset["x"][test_idx])
 
@@ -589,6 +639,11 @@ def main() -> None:
         },
         "pooled_patient_at_0.5": pooled_patient,
     }
+    if args.model not in ("logreg", "cnn"):
+        # Recorded only for the capacity-experiment arms: the parameters and MACs
+        # per window are what make "a bigger model" a checkable claim, and they
+        # come from the same table ``hs_cnn.build_model`` builds from.
+        report["architecture"] = architecture_budget(args.model)
     if folds_provenance is not None:
         # Recorded only for --splits-file runs: the fingerprint is the citation
         # that two experiments used the exact same patient folds.
