@@ -6,6 +6,12 @@ band-limited systolic murmur, background noise and slow baseline wander. It is
 only used to validate the training/evaluation/budget harness when the real
 dataset is unavailable. Results on this dataset must never be reported as
 clinical evidence.
+
+Timing model: S1 onset is fixed at 80 ms; the systolic interval follows a
+Bazett-like scaling, ``systole = 0.30 * sqrt(RR / (60/70))`` clamped to
+[0.20 s, 0.34 s], so that S2 arrives after a physiological systole instead of
+collapsing onto S1 at high heart rates. This matters because the S1/S2
+event-level evaluation assumes the two events are separable.
 """
 
 from __future__ import annotations
@@ -13,6 +19,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import random
 import wave
 from pathlib import Path
@@ -20,6 +27,10 @@ from pathlib import Path
 import numpy as np
 
 from hs_features import design_bandpass_fir, filtfilt
+
+#: Reference RR interval used by the systolic-duration model (70 bpm).
+REFERENCE_RR_S = 60.0 / 70.0
+SYSTOLE_FRACTION = 0.30
 
 
 def parse_args() -> argparse.Namespace:
@@ -53,22 +64,35 @@ def synthesize_recording(
     duration_s: float,
     murmur: bool,
     heart_rate_bpm: float,
-) -> np.ndarray:
+) -> tuple[np.ndarray, list[tuple[float, float, int]]]:
+    """Return the waveform and CirCor-style ``(start, end, label)`` segments.
+
+    Labels follow the CirCor convention: ``1=S1``, ``2=systole``, ``3=S2``,
+    ``4=diastole``. Each S1/S2 segment is symmetric around its onset so that
+    the segment centre equals the true event time; this keeps the ground truth
+    free of the systematic offset that an asymmetric window would introduce.
+    """
     n_samples = int(round(duration_s * sample_rate))
     time = np.arange(n_samples) / sample_rate
     signal = np.zeros(n_samples, dtype=np.float64)
+    beats: list[tuple[float, float]] = []
 
     rr = 60.0 / heart_rate_bpm
     s1_time = 0.08
-    s2_time = 0.30 * rr
+    systole_s = min(
+        0.34, max(0.20, SYSTOLE_FRACTION * math.sqrt(rr / REFERENCE_RR_S))
+    )
+    s2_time = s1_time + systole_s
     beat_start = 0.0
     s1_amplitude = rng.uniform(0.5, 0.9)
     s2_amplitude = rng.uniform(0.3, 0.6)
 
     while beat_start < duration_s:
+        s1_center = beat_start + s1_time
+        s2_center = beat_start + s2_time
         for center, frequency, decay, amplitude in (
-            (beat_start + s1_time, rng.uniform(25, 45), 0.045, s1_amplitude),
-            (beat_start + s2_time, rng.uniform(35, 65), 0.035, s2_amplitude),
+            (s1_center, rng.uniform(25, 45), 0.045, s1_amplitude),
+            (s2_center, rng.uniform(35, 65), 0.035, s2_amplitude),
         ):
             start = int(round(center * sample_rate))
             length = int(round(0.15 * sample_rate))
@@ -78,6 +102,8 @@ def synthesize_recording(
             signal[start : start + len(segment_time)] += amplitude * damped_tone(
                 segment_time, frequency, decay
             )
+        if s1_center < duration_s:
+            beats.append((s1_center, s2_center))
         if murmur:
             murmur_start = int(round((beat_start + s1_time + 0.04) * sample_rate))
             murmur_end = int(round((beat_start + s2_time - 0.02) * sample_rate))
@@ -95,7 +121,41 @@ def synthesize_recording(
     wander = np.sin(2 * np.pi * rng.uniform(0.2, 0.8) * time + rng.uniform(0, 6))
     signal = signal + 0.05 * background + 0.03 * wander
     signal *= rng.uniform(0.6, 1.0)
-    return np.clip(signal, -1.0, 1.0)
+    return np.clip(signal, -1.0, 1.0), build_segments(beats, duration_s)
+
+
+def build_segments(
+    beats: list[tuple[float, float]], duration_s: float, half_width_s: float = 0.05
+) -> list[tuple[float, float, int]]:
+    """Turn beat onsets into CirCor-style annotation rows."""
+    segments: list[tuple[float, float, int]] = []
+    for index, (s1_center, s2_center) in enumerate(beats):
+        s1_start = max(0.0, s1_center - half_width_s)
+        s1_end = min(duration_s, s1_center + half_width_s)
+        s2_start = max(0.0, s2_center - half_width_s)
+        s2_end = min(duration_s, s2_center + half_width_s)
+        if s1_end > s1_start:
+            segments.append((s1_start, s1_end, 1))
+        if s2_center < duration_s and s2_end > s2_start:
+            if s2_start > s1_end:
+                segments.append((s1_end, s2_start, 2))
+            segments.append((s2_start, s2_end, 3))
+        next_s1_start = (
+            beats[index + 1][0] - half_width_s
+            if index + 1 < len(beats)
+            else duration_s
+        )
+        if s2_end < duration_s and min(next_s1_start, duration_s) > s2_end:
+            segments.append((s2_end, min(next_s1_start, duration_s), 4))
+    return segments
+
+
+def write_segments(path: Path, segments: list[tuple[float, float, int]]) -> None:
+    """Write annotation rows in the CirCor ``start end label`` text format."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [f"{start:.4f} {end:.4f} {label}" for start, end, label in segments]
+    path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
 
 
 def write_wav(path: Path, samples: np.ndarray, sample_rate: int) -> None:
@@ -129,11 +189,13 @@ def main() -> None:
         for location in chosen_locations:
             record_id = f"{subject_id}_{location}"
             duration = rng.uniform(8.0, 20.0)
-            samples = synthesize_recording(
+            samples, segments = synthesize_recording(
                 np_rng, args.sample_rate, duration, bool(label), heart_rate
             )
             wav_path = wav_dir / f"{record_id}.wav"
             write_wav(wav_path, samples, args.sample_rate)
+            tsv_path = out_dir / "segments" / f"{record_id}.tsv"
+            write_segments(tsv_path, segments)
             total_duration += duration
             recordings.append(
                 {
@@ -145,6 +207,8 @@ def main() -> None:
                     "record_id": record_id,
                     "location": location,
                     "wav_path": str(wav_path),
+                    "tsv_path": str(tsv_path),
+                    "segment_count": len(segments),
                     "sample_rate": args.sample_rate,
                     "n_samples": len(samples),
                     "channels": 1,
@@ -179,6 +243,8 @@ def main() -> None:
         "seed": args.seed,
         "subjects": len(subjects),
         "recordings": len(recordings),
+        "segments": int(sum(row["segment_count"] for row in recordings)),
+        "segments_dir": str(out_dir / "segments"),
         "split_subjects": count_by(subjects, "split"),
         "split_labels": {
             split: count_by([row for row in subjects if row["split"] == split], "label")
@@ -191,6 +257,7 @@ def main() -> None:
     print(json.dumps(summary, indent=2))
     print(f"[synthetic] wrote {out_dir / 'subjects.csv'}")
     print(f"[synthetic] wrote {out_dir / 'recordings.csv'}")
+    print(f"[synthetic] wrote {out_dir / 'segments'}/<record_id>.tsv")
 
 
 def assign_splits(subjects: list[dict], seed: int) -> dict[str, str]:

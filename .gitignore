@@ -17,3 +17,9 @@ data/
 *.onnx
 *.tflite
 *.npz
+
+# ESP-IDF firmware artifacts (firmware/ is a separate ESP-IDF project)
+firmware/build/
+firmware/sdkconfig
+firmware/managed_components/
+firmware/sdkconfig.old

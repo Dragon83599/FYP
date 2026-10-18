@@ -1,0 +1,104 @@
+# ESP-IDF project defaults for the PCG stethoscope host (ESP32-S3).
+#
+# Only values that differ from the ESP-IDF v5.5.6 defaults (or that encode a
+# decision from docs/engineering-decision-register.md and
+# docs/link-a-gatt-profile.md) are listed. Everything else stays at the IDF
+# default so that upgrading IDF is cheap.
+#
+# Applied by `idf.py set-target esp32s3` (and on every reconfigure if
+# CONFIG_SDKCONFIG_DEFAULTS is used). If you change a value here after a build,
+# delete sdkconfig (it is git-ignored) or run `idf.py reconfigure`.
+
+# ---------------------------------------------------------------------------
+# Target and clock
+# ---------------------------------------------------------------------------
+CONFIG_IDF_TARGET="esp32s3"
+
+# 240 MHz: the 63-tap Q15 decimator costs ~0.5 MMAC/s (ADR-014) but the AI
+# window copy and LVGL later need the headroom, and the S3 is dual-core so the
+# BLE host task can stay on core 0.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# -O2 rather than the default -Og: the decimator runs per input sample and the
+# int64_t accumulator is the hot loop. Size impact is a few KiB of flash.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y
+
+# ---------------------------------------------------------------------------
+# Flash / partitions
+# ---------------------------------------------------------------------------
+# ASSUMPTION, no board selected yet (ADR-006 still open): 4 MB flash, which is
+# the common ESP32-S3-DevKitC / WROOM-1 module size. Not verified on hardware.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+
+# 1500 KiB factory app, no OTA. The NimBLE central image is ~800 KiB, and an
+# OTA slot would halve the space available for the INT8 model (68.8 KiB,
+# ADR-007) plus future assets. OTA is out of MVP scope.
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# ---------------------------------------------------------------------------
+# Bluetooth: NimBLE, central only
+# ---------------------------------------------------------------------------
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+
+# This firmware is a central only (docs/link-a-gatt-profile.md section 4).
+# Disabling peripheral/broadcaster removes the GATT server, advertising and
+# the corresponding buffers from the image.
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=n
+CONFIG_BT_NIMBLE_GATT_CLIENT=y
+
+# One probe, one connection (GATT profile section 6: a single binding).
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+#
+# Bond *storage* capacity is 3 (the ESP-IDF default) rather than 1, and this is
+# a deliberate, documented deviation from "1 binding":
+#   - With MAX_BONDS=1 the NimBLE storage arrays have one element and GCC 14
+#     (crosstool-NG esp-14.2.0_20260121) rejects upstream
+#     ble_store_nvs.c:820 with -Werror=array-bounds, because it cannot prove the
+#     runtime loop bound. That is a compiler false positive in Espressif's
+#     file, and this project must not patch ESP-IDF.
+#   - The "one binding" requirement is enforced by behaviour, not by the array
+#     size: one connection (above), scanning filtered by the LKA1 service UUID,
+#     and no pairing initiated with any other device. A second bond record can
+#     only appear if another device explicitly pairs, and the probe would then
+#     be unusable until the operator unbinds (profile section 6).
+# Revisit if Espressif fixes the warning or if a real second-bond incident is
+# observed on hardware.
+CONFIG_BT_NIMBLE_MAX_BONDS=3
+
+# ATT MTU 247 must be negotiated BEFORE the Audio Data CCCD is enabled
+# (GATT profile section 4, ordering constraint 1). The host requests this value
+# on connect; ble_central.c additionally refuses to subscribe until the
+# BLE_GAP_EVENT_MTU event has been seen.
+CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=247
+
+# BLE 5: 2M PHY is a frozen link parameter (link-a-interface-freeze.md).
+# Coded PHY is explicitly not used, so it is compiled out.
+CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT=y
+CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_2M_PHY=y
+CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_CODED_PHY=n
+
+# LE Secure Connections + bonding; the probe is NoInputNoOutput so the
+# association model is Just Works, with the documented MITM risk (GATT profile
+# section 6). Bond keys go to NVS so a reboot does not need re-pairing.
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=y
+CONFIG_BT_NIMBLE_SM_SC=y
+CONFIG_BT_NIMBLE_SM_SC_ONLY=1
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
+
+# 4 KiB is enough for the host task today, but the GATTC discovery path plus
+# logging in this firmware is deeper than the examples; 5 KiB leaves margin.
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=5120
+
+# Pin the host task to core 0 (PRO CPU) and keep the AI/display consumer on
+# core 1 so a slow render cannot delay HCI processing.
+CONFIG_BT_NIMBLE_PINNED_TO_CORE_0=y
+
+# WARNING (not INFO): the NimBLE info log is ~1 line per HCI event and would
+# dominate the UART at 50 packets/s.
+CONFIG_BT_NIMBLE_LOG_LEVEL_WARNING=y

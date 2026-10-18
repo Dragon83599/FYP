@@ -73,3 +73,54 @@ def annotated_window_starts(
         if annotated_fraction(labels, start, window_samples) >= min_annotated_fraction:
             starts.append(start)
     return np.asarray(starts, dtype=np.int64)
+
+
+def annotated_intervals(
+    segments,
+    duration_s: float | None = None,
+    labels: tuple[int, ...] = (1, 2, 3, 4),
+) -> list[tuple[float, float]]:
+    """Merge the time intervals covered by real annotations.
+
+    CirCor writes ``label 0`` rows for unannotated or low-quality signal, and
+    those rows can span the whole recording. Any event detected there has no
+    reference and would otherwise be counted as a false positive, so event
+    metrics must be restricted to the ``labels`` intervals (1=S1, 2=systole,
+    3=S2, 4=diastole by default).
+
+    Returns sorted, non-overlapping ``(start, end)`` pairs in seconds.
+    """
+    segments = np.asarray(segments, dtype=np.float64)
+    if segments.size == 0:
+        return []
+    keep = np.isin(segments[:, 2].astype(int), np.asarray(labels, dtype=int))
+    rows = segments[keep]
+    if len(rows) == 0:
+        return []
+    valid = rows[:, 1] > rows[:, 0]
+    rows = rows[valid]
+    if len(rows) == 0:
+        return []
+    starts = np.maximum(rows[:, 0], 0.0)
+    ends = rows[:, 1] if duration_s is None else np.minimum(rows[:, 1], float(duration_s))
+    order = np.argsort(starts, kind="mergesort")
+    starts = starts[order]
+    ends = ends[order]
+    merged: list[list[float]] = []
+    for start, end in zip(starts, ends):
+        if end <= start:
+            continue
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], float(end))
+        else:
+            merged.append([float(start), float(end)])
+    return [(start, end) for start, end in merged]
+
+
+def mask_times(times, intervals: list[tuple[float, float]]) -> np.ndarray:
+    """Boolean mask of event times that fall inside any annotated interval."""
+    times = np.asarray(times, dtype=np.float64).reshape(-1)
+    mask = np.zeros(len(times), dtype=bool)
+    for start, end in intervals:
+        mask |= (times >= start) & (times <= end)
+    return mask

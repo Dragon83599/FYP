@@ -7,6 +7,11 @@ choose the decision threshold. Supported models:
 
 - ``logreg``: log-mel summary features + L2 logistic regression (NumPy).
 - ``cnn``: the small 1D CNN trained on raw windows (PyTorch, CPU).
+
+By default the folds are re-derived from ``--seed`` (legacy behaviour). Pass
+``--splits-file`` to use a frozen ``splits.csv`` from
+``tools/ai/freeze_splits.py`` instead; the report then records the split
+fingerprint so two runs can be proven to use the same patient folds.
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ from hs_features import (
 from hs_metrics import best_threshold, binary_metrics, bootstrap_ci
 from hs_models import LogisticRegression, StandardScaler
 from hs_segments import annotated_window_starts, load_segments
+from hs_splits import fold_sets, load_splits, splits_fingerprint, validate_splits
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,6 +54,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--silence-rms", type=float, default=1e-4)
     parser.add_argument("--val-ratio", type=float, default=0.15)
     parser.add_argument("--seed", type=int, default=20261008)
+    parser.add_argument(
+        "--splits-file",
+        default=None,
+        help=(
+            "Frozen patient fold file from tools/ai/freeze_splits.py. When set, "
+            "the folds are read from this file (and its sha256 fingerprint is "
+            "recorded in the report) instead of being derived from --seed. "
+            "Default None keeps the legacy seed-derived folds."
+        ),
+    )
     # logistic regression
     parser.add_argument("--epochs", type=int, default=400)
     parser.add_argument("--learning-rate", type=float, default=0.05)
@@ -163,6 +179,73 @@ def stratified_folds(
     return folds
 
 
+def load_frozen_folds(
+    splits_path: Path, labels: dict[str, int]
+) -> tuple[list[set[str]], dict]:
+    """Read a frozen ``splits.csv`` and return ``(fold sets, provenance)``.
+
+    Every subject that contributed windows must have a frozen fold. Subjects in
+    the frozen file that produced no window (for example because a window filter
+    removed all their recordings) are dropped with a warning, so a frozen
+    protocol can still be applied to a filtered run without silently moving a
+    patient between folds.
+    """
+    frozen = load_splits(splits_path)
+    missing = sorted(set(labels) - set(frozen))
+    if missing:
+        raise SystemExit(
+            f"{splits_path}: {len(missing)} collected subject(s) are not in the "
+            f"frozen split file (first: {missing[:5]})"
+        )
+    dropped = sorted(set(frozen) - set(labels))
+    if dropped:
+        print(
+            f"[cv] warning: {len(dropped)} frozen subject(s) contributed no "
+            f"window and are ignored (first: {dropped[:5]})"
+        )
+    frozen = {subject: frozen[subject] for subject in labels}
+    n_folds = max(frozen.values()) + 1
+    present = set(frozen.values())
+    if present != set(range(n_folds)):
+        raise SystemExit(
+            f"{splits_path}: fold indices must be contiguous from 0, got "
+            f"{sorted(present)}"
+        )
+    validate_splits(frozen, labels, n_folds)
+    return fold_sets(frozen, n_folds), {
+        "kind": "frozen_splits_file",
+        "path": str(splits_path),
+        "n_folds": n_folds,
+        "fingerprint": splits_fingerprint(frozen),
+    }
+
+
+def resolve_folds(
+    args: argparse.Namespace, labels: dict[str, int]
+) -> tuple[list[set[str]], int, dict | None]:
+    """Return ``(folds, n_folds, provenance)``; a frozen file wins over ``--seed``.
+
+    ``provenance`` is ``None`` for the legacy seed-derived path, so the default
+    report stays byte-identical.
+    """
+    if not args.splits_file:
+        return stratified_folds(labels, args.folds, args.seed), args.folds, None
+    folds, provenance = load_frozen_folds(Path(args.splits_file), labels)
+    n_folds = provenance["n_folds"]
+    if n_folds != args.folds:
+        raise SystemExit(
+            f"{args.splits_file}: the frozen file defines {n_folds} folds but "
+            f"--folds={args.folds}; pass --folds {n_folds} "
+            f"(a frozen protocol cannot be re-cut)"
+        )
+    provenance["val_split"] = {
+        "rule": "seed + fold_index",
+        "seed": args.seed,
+        "val_ratio": args.val_ratio,
+    }
+    return folds, n_folds, provenance
+
+
 def split_train_val(
     pool: set[str], labels: dict[str, int], val_ratio: float, seed: int
 ) -> tuple[set[str], set[str]]:
@@ -236,7 +319,12 @@ def main() -> None:
         raise SystemExit("no windows collected")
 
     labels = subject_labels(dataset)
-    folds = stratified_folds(labels, args.folds, args.seed)
+    folds, n_folds, folds_provenance = resolve_folds(args, labels)
+    if folds_provenance is not None:
+        print(
+            f"[cv] frozen splits: {folds_provenance['path']} "
+            f"n_folds={n_folds} fingerprint={folds_provenance['fingerprint']}"
+        )
     pooled_probability: list[float] = []
     pooled_truth: list[int] = []
     per_fold: list[dict] = []
@@ -360,6 +448,10 @@ def main() -> None:
         },
         "pooled_patient_at_0.5": pooled_patient,
     }
+    if folds_provenance is not None:
+        # Recorded only for --splits-file runs: the fingerprint is the citation
+        # that two experiments used the exact same patient folds.
+        report["folds_source"] = folds_provenance
     (out_dir / "report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -374,12 +466,23 @@ def write_markdown(path: Path, report: dict) -> None:
         "",
         f"- Model: {report['model']}",
         f"- Folds: {report['folds']}",
-        f"- Window selection: {report['window_selection']}",
-        f"- Windows: {report['windows_total']}, subjects: {report['subjects_total']}",
-        "",
-        "| Fold | Test subjects | Window AUROC | Patient AUROC | Patient BA | Sensitivity | Specificity |",
-        "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
+    source = report.get("folds_source")
+    if source:
+        lines.append(f"- Frozen splits: `{source['path']}` (sha256 `{source['fingerprint']}`)")
+        lines.append(
+            f"- Validation split inside each fold: {source['val_split']['rule']} "
+            f"(seed {source['val_split']['seed']}, ratio {source['val_split']['val_ratio']})"
+        )
+    lines.extend(
+        [
+            f"- Window selection: {report['window_selection']}",
+            f"- Windows: {report['windows_total']}, subjects: {report['subjects_total']}",
+            "",
+            "| Fold | Test subjects | Window AUROC | Patient AUROC | Patient BA | Sensitivity | Specificity |",
+            "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
     for fold in report["per_fold"]:
         lines.append(
             "| {fold} | {n_test_subjects} | {wa:.3f} | {pa:.3f} | {pb:.3f} | "
