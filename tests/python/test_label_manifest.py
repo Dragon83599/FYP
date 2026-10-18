@@ -20,7 +20,7 @@ from hs_splits import load_splits, splits_fingerprint
 def write_manifest(directory: Path, rows: list[dict]) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     subject_fields = ["subject_id", "murmur", "label", "outcome", "campaign", "n_recordings"]
-    recording_fields = ["subject_id", "record_id", "label", "wav_path"]
+    recording_fields = ["subject_id", "record_id", "label", "split", "wav_path"]
     subjects = []
     recordings = []
     for index, row in enumerate(rows):
@@ -39,6 +39,7 @@ def write_manifest(directory: Path, rows: list[dict]) -> None:
                 "subject_id": row["subject_id"],
                 "record_id": f"{row['subject_id']}_AV",
                 "label": row["label"],
+                "split": row.get("split", "train"),
                 "wav_path": f"/nonexistent/{row['subject_id']}_AV.wav",
             }
         )
@@ -158,3 +159,31 @@ class Int8DriverTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StaleSplitColumnTests(unittest.TestCase):
+    """A derived label must not inherit the source's stale split column."""
+
+    def test_outcome_keeps_patients_marked_unused_in_the_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "src"
+            out = Path(tmp) / "out"
+            rows = [
+                {"subject_id": "n0", "murmur": "Absent", "label": "0", "outcome": "Normal", "campaign": "CC2015"},
+                {"subject_id": "n1", "murmur": "Absent", "label": "0", "outcome": "Normal", "campaign": "CC2015"},
+                {"subject_id": "x0", "murmur": "Present", "label": "1", "outcome": "Abnormal", "campaign": "CC2015"},
+                {"subject_id": "x1", "murmur": "Present", "label": "1", "outcome": "Abnormal", "campaign": "CC2015"},
+                # Unknown murmur, but a valid outcome: must survive the derived label.
+                {"subject_id": "u0", "murmur": "Unknown", "label": "", "outcome": "Abnormal", "campaign": "CC2015", "split": "unused"},
+            ]
+            write_manifest(source, rows)
+            # The unknown-murmur patient is marked "unused" by the write helper,
+            # exactly like prepare_circor does for the source manifest.
+            completed = run_manifest("--source", str(source), "--out", str(out), "--label", "outcome", "--n-folds", "2")
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            with (out / "recordings.csv").open(newline="") as handle:
+                kept = {row["subject_id"] for row in csv.DictReader(handle)}
+            self.assertEqual(kept, {"n0", "n1", "x0", "x1", "u0"})
+            with (out / "recordings.csv").open(newline="") as handle:
+                splits = {row["split"] for row in csv.DictReader(handle)}
+            self.assertTrue(splits <= {"train", "val", "test"}, splits)

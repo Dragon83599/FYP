@@ -91,8 +91,15 @@ def main() -> None:
         raise SystemExit(f"no subject has a usable '{label_field}' label")
 
     kept_ids = set(labels)
+    # ``cross_validate.load_rows`` keeps only rows whose ``split`` is
+    # train/val/test, and the source manifest marks patients with unknown
+    # murmur as "unused". That column is stale for a derived label: an outcome
+    # patient with unknown murmur still has a valid outcome label, and dropping
+    # them would silently shrink the cohort (68 patients for CirCor outcome).
+    # The frozen split file is authoritative, so every kept row gets a valid
+    # placeholder and the real assignment comes from splits.csv.
     kept_recordings = [
-        {**row, "label": str(labels[row["subject_id"]])}
+        {**row, "label": str(labels[row["subject_id"]]), "split": "train"}
         for row in recordings
         if row["subject_id"] in kept_ids
     ]
