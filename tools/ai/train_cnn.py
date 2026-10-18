@@ -33,6 +33,13 @@ from hs_cnn import (
 from hs_features import design_bandpass_fir, filtfilt, iter_windows, read_wav_mono
 from hs_metrics import best_threshold, binary_metrics, bootstrap_ci
 from hs_segments import annotated_window_starts, load_segments
+from hs_splits import (
+    DEFAULT_SEED,
+    apply_frozen_split,
+    frozen_split_cache_key,
+    split_cache_key,
+    split_cache_matches,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,6 +64,37 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--min-annotated-fraction", type=float, default=0.5)
     parser.add_argument("--rebuild-cache", action="store_true")
+    parser.add_argument(
+        "--splits-file",
+        default="",
+        help="Frozen patient-level splits.csv from freeze_splits.py. When given, "
+        "the single train/val/test split is derived from one fold of that file "
+        "instead of prepare_circor's random split. The file's fingerprint, the "
+        "fold, and the train/val carve seed are part of the window-cache key, so "
+        "a re-frozen file at the same path invalidates a stale cache.",
+    )
+    parser.add_argument(
+        "--fold",
+        type=int,
+        default=0,
+        help="Which frozen fold is the test set when --splits-file is given.",
+    )
+    parser.add_argument(
+        "--split-seed",
+        type=int,
+        default=None,
+        help="Seed for the train/val carve when --splits-file is given; the "
+        f"effective seed is this value + fold. Default {DEFAULT_SEED} so the "
+        "carve matches cross_validate.py for the same fold. It is separate from "
+        "--seed, which only seeds training and stays the same either way.",
+    )
+    parser.add_argument(
+        "--val-ratio",
+        type=float,
+        default=0.15,
+        help="Validation fraction of the non-test folds when --splits-file is "
+        "given (cross_validate.py uses the same default). Ignored otherwise.",
+    )
     parser.add_argument("--skip-onnx", action="store_true")
     return parser.parse_args()
 
@@ -74,14 +112,47 @@ class WindowDataset(Dataset):
         return torch.from_numpy(window), torch.tensor(float(self.labels[index]))
 
 
-def load_recordings(data_dir: Path) -> list[dict]:
+def split_seed_for(args: argparse.Namespace) -> int:
+    """Effective seed of the frozen train/val carve (``seed + fold`` is applied
+    inside :func:`apply_frozen_split`).
+
+    It must default to ``hs_splits.DEFAULT_SEED`` (not to ``--seed``, the
+    training RNG seed) so the carve reproduces ``cross_validate.py``'s
+    ``split_train_val(pool, labels, val_ratio, args.seed + fold_index)`` for the
+    same fold and the per-fold report stays comparable with the CV fold.
+    """
+    return DEFAULT_SEED if getattr(args, "split_seed", None) is None else int(args.split_seed)
+
+
+def load_recordings(data_dir: Path, require_prepare_split: bool = True) -> list[dict]:
+    """Return the manifest rows usable for training.
+
+    ``require_prepare_split`` keeps only rows that ``prepare_circor.py`` placed
+    in train/val/test (the default, unchanged behaviour).  A frozen split file
+    replaces that assignment, so frozen runs load every labelled row instead:
+    otherwise a labelled subject that ``prepare_circor.py`` marked ``unused``
+    would silently vanish from the frozen protocol.
+    """
     with (data_dir / "recordings.csv").open(newline="", encoding="utf-8") as handle:
         rows = [row for row in csv.DictReader(handle)]
-    return [row for row in rows if row["split"] in ("train", "val", "test") and row["label"] in ("0", "1")]
+    labelled = [row for row in rows if row["label"] in ("0", "1")]
+    if not require_prepare_split:
+        return labelled
+    return [row for row in labelled if row["split"] in ("train", "val", "test")]
 
 
 def build_cache(data_dir: Path, args: argparse.Namespace) -> tuple[dict, dict]:
-    rows = load_recordings(data_dir)
+    frozen = bool(getattr(args, "splits_file", ""))
+    rows = load_recordings(data_dir, require_prepare_split=not frozen)
+    folds_source = {"kind": "prepare_circor_split"}
+    if frozen:
+        rows, folds_source = apply_frozen_split(
+            rows,
+            Path(args.splits_file),
+            int(args.fold),
+            float(args.val_ratio),
+            split_seed_for(args),
+        )
     cache = {
         split: {"x": [], "y": [], "subject": [], "record": []}
         for split in ("train", "val", "test")
@@ -144,13 +215,16 @@ def build_cache(data_dir: Path, args: argparse.Namespace) -> tuple[dict, dict]:
             "subject": np.asarray(bucket["subject"]),
             "record": np.asarray(bucket["record"]),
         }
-    return result, {"skipped_unannotated": skipped_unannotated}
+    return result, {
+        "skipped_unannotated": skipped_unannotated,
+        "folds_source": folds_source,
+    }
 
 
 def save_cache(data_dir: Path, cache: dict, stats: dict) -> None:
-    (data_dir / "windows-stats.json").write_text(
-        json.dumps(stats, indent=2) + "\n", encoding="utf-8"
-    )
+    # windows-stats.json is the marker the cache hit/miss logic trusts, so it is
+    # written last: an interrupted build then leaves an unmarked (stale) cache
+    # instead of a stats file that vouches for windows that were never written.
     for split in ("train", "val", "test"):
         bucket = cache[split]
         np.save(data_dir / f"windows-{split}.npy", bucket["x"])
@@ -160,6 +234,9 @@ def save_cache(data_dir: Path, cache: dict, stats: dict) -> None:
             subject=bucket["subject"],
             record=bucket["record"],
         )
+    (data_dir / "windows-stats.json").write_text(
+        json.dumps(stats, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def load_saved_cache(data_dir: Path) -> dict:
@@ -335,6 +412,20 @@ def onnx_predict(path: Path, windows: np.ndarray, batch_size: int = 128) -> np.n
     return np.concatenate(outputs).reshape(-1) if outputs else np.zeros(0)
 
 
+def describe_split_change(recorded, requested: dict) -> str:
+    """Summarise which split fields invalidate a cached window split."""
+    key = split_cache_key(recorded)
+    if key is None:
+        return "the recorded cache has no usable split provenance"
+    if key.get("kind") != requested["kind"]:
+        return f"kind: {key.get('kind')!r} -> {requested['kind']!r}"
+    return ", ".join(
+        f"{field}: {key.get(field)!r} -> {requested[field]!r}"
+        for field in sorted(requested)
+        if key.get(field) != requested[field]
+    )
+
+
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -345,10 +436,37 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     cache_file = data_dir / "windows-train.npy"
+    # The expected cache key is derived from the split *file content* (its
+    # fingerprint), not just from its path, so a re-frozen splits.csv at the
+    # same path can never reuse windows built for a different assignment.
+    requested_split = (
+        frozen_split_cache_key(
+            Path(args.splits_file), args.fold, args.val_ratio, split_seed_for(args)
+        )
+        if args.splits_file
+        else {"kind": "prepare_circor_split"}
+    )
+    cache = None
     if cache_file.exists() and not args.rebuild_cache:
-        cache = load_saved_cache(data_dir)
-    else:
+        loaded = load_saved_cache(data_dir)
+        recorded_split = loaded.get("_stats", {}).get("folds_source")
+        if split_cache_matches(recorded_split, requested_split):
+            cache = loaded
+        else:
+            print(
+                "[cache] split configuration changed; rebuilding the window cache ("
+                + describe_split_change(recorded_split, requested_split)
+                + ")"
+            )
+    if cache is None:
         cache, stats = build_cache(data_dir, args)
+        # A splits.csv rewritten between the key above and the cache build would
+        # otherwise be saved under a key that describes a different assignment.
+        if not split_cache_matches(stats["folds_source"], requested_split):
+            raise SystemExit(
+                f"{args.splits_file}: the frozen split file changed while the window "
+                "cache was being built; re-run once the file is stable"
+            )
         save_cache(data_dir, cache, stats)
         cache["_stats"] = stats
     print(
@@ -370,6 +488,7 @@ def main() -> None:
         "hop_sec": args.hop_sec,
         "max_windows_per_record": args.max_windows_per_record,
         "window_selection": args.window_selection,
+        "folds_source": cache.get("_stats", {}).get("folds_source", {"kind": "unknown"}),
         "min_annotated_fraction": args.min_annotated_fraction,
         "skipped_unannotated_windows": int(
             cache.get("_stats", {}).get("skipped_unannotated", -1)

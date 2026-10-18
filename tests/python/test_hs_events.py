@@ -204,3 +204,23 @@ class AnnotationMaskTests(unittest.TestCase):
         )
         mask = mask_times(np.array([0.05, 0.35, 0.65]), annotated_intervals(segments))
         np.testing.assert_array_equal(mask, [True, True, True])
+
+
+class HeartRateReportTests(unittest.TestCase):
+    """The heart-rate evaluation helper must stay well-defined on edge cases."""
+
+    def test_empty_error_list(self) -> None:
+        from evaluate_heart_rate import summarize_errors
+
+        self.assertEqual(summarize_errors([]), {"n": 0})
+
+    def test_error_summary_statistics(self) -> None:
+        from evaluate_heart_rate import summarize_errors
+
+        stats = summarize_errors([0.0, 2.0, -4.0, 10.0])
+        self.assertEqual(stats["n"], 4)
+        self.assertAlmostEqual(stats["mean_abs_bpm"], 4.0)
+        self.assertAlmostEqual(stats["median_abs_bpm"], 3.0)
+        self.assertAlmostEqual(stats["max_abs_bpm"], 10.0)
+        self.assertAlmostEqual(stats["within_5_bpm"], 0.75)
+        self.assertAlmostEqual(stats["within_10_bpm"], 1.0)

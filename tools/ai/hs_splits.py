@@ -463,3 +463,175 @@ def _normalise_metadata(extra_metadata) -> dict[str, str]:
             )
         metadata[key] = value
     return metadata
+
+
+def _stratified_train_val(
+    pool: set[str], labels: dict[str, int], val_ratio: float, seed: int
+) -> tuple[set[str], set[str]]:
+    """Same rule as ``cross_validate.split_train_val`` (kept local on purpose).
+
+    ``cross_validate`` imports this module, so importing it back would be a
+    cycle. The rule is duplicated here and an equivalence test in
+    ``tests/python/test_hs_splits.py`` fails if the two ever drift.
+    """
+    import random
+
+    rng = random.Random(seed)
+    train: set[str] = set()
+    validation: set[str] = set()
+    for label in (0, 1):
+        subjects = sorted(subject for subject in pool if labels[subject] == label)
+        rng.shuffle(subjects)
+        n_val = max(1, int(round(len(subjects) * val_ratio))) if len(subjects) >= 2 else 0
+        validation.update(subjects[:n_val])
+        train.update(subjects[n_val:])
+    return train, validation
+
+
+def apply_frozen_split(
+    rows: list[dict],
+    splits_path,
+    fold_index: int,
+    val_ratio: float = 0.15,
+    seed: int = 20261008,
+) -> tuple[list[dict], dict]:
+    """Reassign ``row["split"]`` from a frozen patient-level fold file.
+
+    The frozen protocol is the 5-fold one used by ``cross_validate.py``. A
+    single-model script takes one fold as the test set and carves the
+    validation set out of the remaining folds with the same rule and the same
+    ``seed + fold_index`` seeding, so its per-fold report is comparable with the
+    corresponding CV fold.
+
+    Returns the reassigned rows and a provenance dict for the report.
+    """
+    from pathlib import Path
+
+    path = Path(splits_path)
+    folds = load_splits(path)
+    labels = {row["subject_id"]: int(row["label"]) for row in rows}
+    missing = sorted(set(labels) - set(folds))
+    if missing:
+        raise SystemExit(
+            f"{path}: {len(missing)} labelled subject(s) are absent from the "
+            f"frozen file (first: {missing[:5]})"
+        )
+    test_subjects = {
+        subject for subject, fold in folds.items() if fold == fold_index
+    } & set(labels)
+    if not test_subjects:
+        raise SystemExit(f"{path}: fold {fold_index} contains no labelled subject")
+    pool = {s: label for s, label in labels.items() if s not in test_subjects}
+    train_subjects, val_subjects = _stratified_train_val(
+        set(pool), pool, val_ratio, seed + fold_index
+    )
+    reassigned: list[dict] = []
+    for row in rows:
+        subject = row["subject_id"]
+        split = (
+            "test"
+            if subject in test_subjects
+            else "val"
+            if subject in val_subjects
+            else "train"
+        )
+        reassigned.append({**row, "split": split})
+    return reassigned, {
+        "kind": "frozen_splits_file",
+        "path": str(path),
+        "fold": int(fold_index),
+        "fingerprint": splits_fingerprint(folds),
+        "val_split": {
+            "rule": "seed + fold_index",
+            "seed": seed + fold_index,
+            "val_ratio": float(val_ratio),
+        },
+        "test_subjects": len(test_subjects),
+        "train_subjects": len(train_subjects),
+        "val_subjects": len(val_subjects),
+    }
+
+
+#: Fields that fully identify one frozen split configuration for cache reuse.
+#: Kept as a tuple so :func:`frozen_split_cache_key` and
+#: :func:`split_cache_key` cannot drift apart silently.
+FROZEN_CACHE_KEY_FIELDS = (
+    "kind",
+    "path",
+    "fold",
+    "fingerprint",
+    "val_split_seed",
+    "val_ratio",
+)
+
+
+def frozen_split_cache_key(
+    splits_path, fold_index: int, val_ratio: float, seed: int
+) -> dict[str, object]:
+    """Return the cache key identifying one frozen split configuration.
+
+    Every input that can change which subject lands in train/val/test is part
+    of the key: the *content* of the split file (its fingerprint, not merely
+    its path), which fold is the test set, and the seed/ratio used to carve
+    train/val out of the remaining folds.
+
+    The fingerprint is recomputed from the file on every call, so a
+    ``splits.csv`` that was re-frozen in place -- same path, same fold index,
+    different ``subject -> fold`` map -- produces a different key.  That is what
+    stops a stale ``windows-*.npy`` cache from feeding a different split into a
+    report.
+    """
+    path = Path(splits_path)
+    folds = load_splits(path)
+    return {
+        "kind": "frozen_splits_file",
+        "path": str(path),
+        "fold": int(fold_index),
+        "fingerprint": splits_fingerprint(folds),
+        "val_split_seed": int(seed) + int(fold_index),
+        "val_ratio": float(val_ratio),
+    }
+
+
+def split_cache_key(folds_source) -> dict[str, object] | None:
+    """Normalise recorded provenance (``folds_source``) to a cache key.
+
+    Returns ``None`` when the provenance is missing or incomplete, i.e. when it
+    cannot prove which split produced a cache.  Callers must treat ``None`` as
+    "unknown split, rebuild", never as "probably fine".
+
+    The legacy ``prepare_circor`` split carries no fingerprint, so its key is
+    just ``{"kind": "prepare_circor_split"}`` -- exactly the comparison the
+    training scripts made before frozen files existed, which keeps default runs
+    reusing an existing cache as before.
+    """
+    if not isinstance(folds_source, dict):
+        return None
+    kind = folds_source.get("kind")
+    if kind == "prepare_circor_split":
+        return {"kind": kind}
+    if kind != "frozen_splits_file":
+        return None
+    val_split = folds_source.get("val_split")
+    if not isinstance(val_split, dict):
+        return None
+    try:
+        key = {
+            "kind": kind,
+            "path": str(folds_source["path"]),
+            "fold": int(folds_source["fold"]),
+            "fingerprint": str(folds_source["fingerprint"]),
+            "val_split_seed": int(val_split["seed"]),
+            "val_ratio": float(val_split["val_ratio"]),
+        }
+    except (KeyError, TypeError, ValueError):
+        return None
+    # Structural guard: a provenance that does not carry every field of the
+    # contract cannot prove its split, so it must not be trusted.
+    return key if set(key) == set(FROZEN_CACHE_KEY_FIELDS) else None
+
+
+def split_cache_matches(folds_source, expected: dict[str, object]) -> bool:
+    """True only when recorded provenance describes exactly ``expected``."""
+    key = split_cache_key(folds_source)
+    return key is not None and key == expected

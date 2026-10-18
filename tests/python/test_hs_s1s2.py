@@ -144,8 +144,134 @@ class ConfigurationTests(unittest.TestCase):
         self.assertAlmostEqual(estimate_heart_rate(np.array([0.1, 0.45, 1.10])), 60.0)
 
 
-if __name__ == "__main__":
-    unittest.main()
+class HighRatePriorTests(unittest.TestCase):
+    """The physiological prior must decide the S1/S2 orientation at high rate.
+
+    Above ~130 bpm systole stops being the shorter interval for many patients,
+    so the legacy "shorter gap is systole" rule inverts the whole recording.
+    These tests pin the mechanism: same event times, different gap_prior.
+    """
+
+    RR_S = 0.40        # 150 bpm
+    SYSTOLE_S = 0.21   # longer than the 0.19 s diastole
+
+    @classmethod
+    def high_rate_times(cls, beats: int = 6) -> np.ndarray:
+        times: list[float] = []
+        for beat in range(beats):
+            start = beat * cls.RR_S
+            times.extend((start, start + cls.SYSTOLE_S))
+        return np.asarray(times, dtype=np.float64)
+
+    def test_default_prior_orients_the_longer_gap_as_systole(self) -> None:
+        times = self.high_rate_times()
+        labels, info = label_events_sequential(times)
+        self.assertTrue(info["prior_active"])
+        self.assertEqual(info["labeler"], "sequential-prior")
+        self.assertGreater(info["systole_prior_s"], info["diastole_prior_s"])
+        expected = np.where(np.arange(len(times)) % 2 == 0, S1, S2)
+        np.testing.assert_array_equal(labels, expected)
+
+    def test_legacy_cluster_rule_inverts_the_same_recording(self) -> None:
+        times = self.high_rate_times()
+        labels, info = label_events_sequential(
+            times, DetectorConfig(gap_prior="cluster")
+        )
+        self.assertFalse(info["prior_active"])
+        self.assertEqual(info["labeler"], "sequential")
+        np.testing.assert_array_equal(labels[:4], [S2, S1, S2, S1])
+
+    def test_prior_is_inactive_below_the_rate_gate(self) -> None:
+        times = np.array([0.20, 0.45, 1.00, 1.25, 1.80, 2.05])
+        labels, info = label_events_sequential(times)
+        legacy, _ = label_events_sequential(
+            times, DetectorConfig(gap_prior="cluster")
+        )
+        np.testing.assert_array_equal(labels, legacy)
+        self.assertFalse(info["prior_active"])
+        self.assertEqual(info["labeler"], "sequential")
+
+    def test_prior_min_bpm_is_configurable(self) -> None:
+        times = self.high_rate_times()
+        labels, info = label_events_sequential(
+            times, DetectorConfig(prior_min_bpm=0.0)
+        )
+        self.assertTrue(info["prior_active"])
+        self.assertEqual(len(labels), len(times))
+
+    def test_model_mode_uses_the_regression_durations(self) -> None:
+        times = self.high_rate_times()
+        _, info = label_events_sequential(times, DetectorConfig(gap_prior="model"))
+        self.assertEqual(info["labeler"], "sequential-prior")
+        self.assertAlmostEqual(info["systole_est_s"], info["systole_prior_s"])
+        self.assertAlmostEqual(info["diastole_est_s"], info["diastole_prior_s"])
+
+    def test_orient_mode_keeps_the_observed_cluster_durations(self) -> None:
+        times = self.high_rate_times()
+        _, info = label_events_sequential(times, DetectorConfig(gap_prior="orient"))
+        # The clusters are 0.19/0.21; the prior only swaps which one is S1.
+        self.assertAlmostEqual(info["systole_est_s"], self.SYSTOLE_S, places=6)
+        self.assertAlmostEqual(
+            info["diastole_est_s"], self.RR_S - self.SYSTOLE_S, places=6
+        )
+
+    def test_candidate_b_fixed_fraction_preset(self) -> None:
+        # Candidate B: S = clamp(0.32 * sqrt(RR), 0.18, 0.34).
+        config = DetectorConfig(
+            gap_prior="model",
+            systole_prior_a=0.32,
+            systole_prior_b=0.0,
+            systole_prior_min_s=0.18,
+            systole_prior_max_s=0.34,
+        )
+        times = self.high_rate_times()
+        _, info = label_events_sequential(times, config)
+        expected = 0.32 * float(np.sqrt(self.RR_S))
+        self.assertAlmostEqual(info["systole_prior_s"], expected, places=6)
+
+    def test_prior_is_clamped_at_both_ends(self) -> None:
+        high = DetectorConfig(
+            gap_prior="model",
+            systole_prior_a=1.0,
+            systole_prior_b=0.0,
+            prior_min_bpm=0.0,
+        )
+        _, info = label_events_sequential(np.array([0.0, 0.6, 1.2, 1.8]), high)
+        self.assertAlmostEqual(info["systole_prior_s"], 0.60)
+        low = DetectorConfig(
+            gap_prior="model", systole_prior_a=0.0, systole_prior_b=0.0
+        )
+        _, info = label_events_sequential(self.high_rate_times(), low)
+        self.assertAlmostEqual(info["systole_prior_s"], 0.10)
+
+    def test_prior_output_is_deterministic(self) -> None:
+        times = self.high_rate_times()
+        first, first_info = label_events_sequential(times)
+        second, second_info = label_events_sequential(times)
+        np.testing.assert_array_equal(first, second)
+        self.assertEqual(first_info, second_info)
+        self.assertGreater(first_info["cycle_est_s"], 0.0)
+
+    def test_high_rate_detection_is_not_inverted_end_to_end(self) -> None:
+        signal, truth = burst_pcg(
+            duration_s=8.0,
+            rr_s=self.RR_S,
+            s1_offset_s=0.10,
+            s2_offset_s=0.31,
+            noise=0.002,
+        )
+        legacy = detect_s1s2(
+            signal, DetectorConfig(sample_rate=SAMPLE_RATE, gap_prior="cluster")
+        )
+        prior = detect_s1s2(signal, DetectorConfig(sample_rate=SAMPLE_RATE))
+        self.assertGreater(legacy.info["heart_rate_bpm"], 140.0)
+        legacy_report = evaluate(truth_events(truth), legacy.events, 0.1)
+        prior_report = evaluate(truth_events(truth), prior.events, 0.1)
+        self.assertGreater(legacy_report["matches"]["swap_rate"], 0.9)
+        self.assertEqual(prior_report["matches"]["swapped"], 0)
+        self.assertGreater(prior_report["f1_macro"], 0.95)
+        self.assertTrue(prior.info["prior_active"])
+
 
 
 class SequentialLabellerTests(unittest.TestCase):
@@ -212,3 +338,7 @@ class SpuriousPeakMergeTests(unittest.TestCase):
         report = evaluate(truth_events(truth), result.events, tolerance_s=0.1)
         self.assertEqual(report["matches"]["swapped"], 0)
         self.assertGreater(report["f1_macro"], 0.9)
+
+
+if __name__ == "__main__":
+    unittest.main()

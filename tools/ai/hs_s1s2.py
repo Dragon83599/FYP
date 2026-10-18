@@ -23,20 +23,40 @@ ported to the ESP32-S3 without a learned model:
    a same-label step allowed at a cost (a missed beat is absorbed locally
    instead of inverting the phase of the whole recording). The legacy rigid
    alternation rule (``labeler="parity"``) is kept for ablation.
+7. Physiological high-rate prior (``gap_prior="orient"``, default): the
+   "shorter gap is systole" heuristic is only valid while diastole is longer
+   than systole, which fails for many patients above ~130 bpm. Above
+   ``prior_min_bpm`` (120 bpm) the DP therefore takes the S1/S2 *orientation*
+   from a population systole/RR regression
+   ``S = systole_prior_a * sqrt(RR) + systole_prior_b`` (clamped), while the
+   observed gap clusters still supply the *durations*. ``gap_prior="model"``
+   uses the regression for both, and ``gap_prior="cluster"`` reproduces the
+   pre-2026-10-18 behaviour exactly. The coefficients were fitted on the
+   frozen patient-level tuning folds only (see ``DetectorConfig``), the RR
+   gate is label-independent, and nothing is learned at run time.
 
-Limitation that must be reported with any result: near 130-140 bpm the
-systolic and diastolic intervals converge and timing alone cannot order S1 and
-S2; the labeller then falls back to the parity/spectral rule and sets
-``info['labeling_reliable'] = False``. Above roughly 150 bpm no single-site PCG
-cue reliably separates the two, so event *positions* remain usable while the
-labels must not be trusted.
+Limitation that must be reported with any result: above ~120 bpm the systolic
+and diastolic intervals are close for many patients, and a single-site PCG
+cannot always order S1 and S2 from timing alone. The physiological prior fixes
+the *population* ordering -- full-cohort macro F1 on the >120 bpm subset rose
+from 0.599 to 0.658 -- but it does not remove whole-recording inversions: the
+>120 bpm swap rate stayed at 0.271 (target < 0.20), because the regression
+predicts which interval is longer for only ~70 % of recordings and the rest are
+individual patients whose systole/diastole ordering is not recoverable from
+timing. ``info['labeling_reliable']`` therefore stays False above
+``reliable_max_bpm``, and the >120 bpm labels must still be quoted separately.
+Above roughly 150 bpm no single-site PCG cue reliably separates the two, so
+event *positions* remain usable while the labels must not be trusted.
 
 Provenance note: the sequential labeller and the peak merge were added to this
 module on 2026-10-18 after the first real-data evaluation (which used the
 parity rule and scored macro F1 0.572). They lift the full-cohort score to
 0.772 and cut the swap rate from 0.361 to 0.110. Their parameter defaults have
 NOT been re-selected inside a patient-level training split, so the gain may be
-partly optimistic; see ADR-008's 2026-10-18 evening supplement.
+partly optimistic; see ADR-008's 2026-10-18 evening supplement. The high-rate
+prior was added afterwards: its coefficients were fitted on the frozen
+patient-level folds 0-3 only and the nested held-out protocol (refit on four
+folds, score the fifth) is recorded in the handover report, not in this module.
 
 Only NumPy and the standard library are required, matching ``hs_features``.
 """
@@ -81,6 +101,27 @@ class DetectorConfig:
     evidence_weight_zcr: float = 0.0
     evidence_weight_amplitude: float = 0.0
     min_events: int = 2
+    #: High-rate labelling strategy. ``"cluster"`` = legacy behaviour (the
+    #: shorter gap cluster is always systole), ``"model"`` = the DP compares
+    #: each gap against the physiological regression, ``"orient"`` = the
+    #: regression only decides which cluster is systole and the observed
+    #: clusters supply the durations (default).
+    gap_prior: str = "orient"
+    #: Systolic interval model S = a*sqrt(RR) + b, fitted on the frozen
+    #: patient-level tuning folds 0-3 of data/processed/circor/splits.csv
+    #: (fingerprint 1f212dea...a47): record-level detected-gap medians,
+    #: labels taken from the CirCor reference, a=0.356707, b=-0.018410 s.
+    #: The held-out nested protocol refitted these on four folds and scored
+    #: the fifth; the fold-wise fits were a in [0.3508, 0.3662] and
+    #: b in [-0.0254, -0.0138], so the frozen values are not fold-specific.
+    systole_prior_a: float = 0.356707
+    systole_prior_b: float = -0.018410
+    systole_prior_min_s: float = 0.10
+    systole_prior_max_s: float = 0.60
+    #: The prior is only used above this heart rate. The threshold matches
+    #: ``reliable_max_bpm`` because diastole is longer than systole below it
+    #: for the population, so the legacy short/long rule is already correct.
+    prior_min_bpm: float = 120.0
 
     def with_sample_rate(self, sample_rate: int) -> "DetectorConfig":
         return replace(self, sample_rate=int(sample_rate))
@@ -230,7 +271,7 @@ def label_events(
 
 
 def _two_gap_centres(gaps: np.ndarray) -> tuple[float, float]:
-    """Robust two-cluster split of the inter-event gaps (short = systole)."""
+    """Robust two-cluster split of the inter-event gaps (shorter, longer)."""
     low = float(np.percentile(gaps, 25))
     high = float(np.percentile(gaps, 75))
     for _ in range(5):
@@ -244,6 +285,42 @@ def _two_gap_centres(gaps: np.ndarray) -> tuple[float, float]:
         low = float(np.median(short))
         high = float(np.median(long))
     return low, high
+
+
+def _cycle_estimate(gaps: np.ndarray) -> float:
+    """One cardiac cycle from the median of consecutive gap pairs.
+
+    Consecutive gaps cover one cycle whatever their S1/S2 order, so this
+    estimate is independent of the labels -- important because the labeller
+    uses it to decide the S1/S2 orientation in the first place.
+    """
+    k = (len(gaps) // 2) * 2
+    if k < 2:
+        return float("nan")
+    return float(np.median(gaps[:k].reshape(-1, 2).sum(axis=1)))
+
+
+def _systolic_prior(cycle_s: float, config: DetectorConfig) -> tuple[float, float]:
+    """Expected (systole, diastole) for one cycle, or ``(nan, nan)``.
+
+    The regression is the classic square-root systolic-time-interval form;
+    diastole is the remainder of the cycle. The clamp keeps a grossly wrong
+    RR estimate from producing an impossible expectation, and diastole is
+    never allowed below 50 ms.
+
+    Fixed-point form for the ESP32: ``s_q15 = (A_q15 * isqrt(rr_q15)) >> 15
+    + B_q15`` with one Q15 square root (16 Newton iterations) and a
+    multiply-accumulate; no division and no runtime learning.
+    """
+    if not np.isfinite(cycle_s) or cycle_s <= 0:
+        return float("nan"), float("nan")
+    systole = config.systole_prior_a * float(np.sqrt(cycle_s)) + config.systole_prior_b
+    systole = min(max(systole, config.systole_prior_min_s), config.systole_prior_max_s)
+    systole = min(systole, cycle_s - 0.05)
+    diastole = cycle_s - systole
+    if systole <= 0 or diastole <= 0:
+        return float("nan"), float("nan")
+    return float(systole), float(diastole)
 
 
 def _merge_close_peaks(
@@ -302,8 +379,12 @@ def label_events_sequential(
 
     Two centroids are estimated from the gaps (short/long) and a two-state
     dynamic program picks the cheapest label sequence. Cost is
-    ``((gap - expected) / expected)**2`` per step, plus
-    ``same_state_penalty`` for a same-label step.
+    ``((gap - expected) / expected)**2`` per step.
+
+    Above ``config.prior_min_bpm`` the expected intervals are no longer taken
+    from the gap clusters alone: the systolic-time-interval regression supplies
+    the S1/S2 orientation (``gap_prior="orient"``) or both expectations
+    (``gap_prior="model"``). ``gap_prior="cluster"`` keeps the legacy rule.
     """
     config = config or DetectorConfig()
     times = np.asarray(times, dtype=np.float64)
@@ -313,6 +394,11 @@ def label_events_sequential(
         "systole_est_s": float("nan"),
         "diastole_est_s": float("nan"),
         "label_separation": float("nan"),
+        "gap_prior": config.gap_prior,
+        "prior_active": False,
+        "cycle_est_s": float("nan"),
+        "systole_prior_s": float("nan"),
+        "diastole_prior_s": float("nan"),
     }
     if n < 2:
         return np.full(n, S1, dtype=np.int8), empty_info
@@ -320,12 +406,38 @@ def label_events_sequential(
     gaps = np.diff(times)
     short, long = _two_gap_centres(gaps)
     separation = long / short if short > 0 else float("inf")
-    if not np.isfinite(separation) or separation < config.min_gap_separation:
+
+    # Physiological orientation prior (see the module docstring). The cycle
+    # estimate is label-independent -- consecutive gaps span one cycle in
+    # either S1/S2 order -- so deciding the orientation from it does not leak
+    # the labels the DP is about to choose.
+    cycle_s = _cycle_estimate(gaps)
+    heart_rate = 60.0 / cycle_s if cycle_s > 0 else float("nan")
+    prior_systole, prior_diastole = _systolic_prior(cycle_s, config)
+    prior_active = bool(
+        config.gap_prior in ("model", "orient")
+        and np.isfinite(prior_systole)
+        and np.isfinite(prior_diastole)
+        and np.isfinite(heart_rate)
+        and heart_rate > config.prior_min_bpm
+    )
+
+    base_info = {
+        "labeler": "sequential",
+        "systole_est_s": float("nan"),
+        "diastole_est_s": float("nan"),
+        "label_separation": separation,
+        "gap_prior": config.gap_prior,
+        "prior_active": prior_active,
+        "cycle_est_s": cycle_s,
+        "systole_prior_s": prior_systole,
+        "diastole_prior_s": prior_diastole,
+    }
+
+    def fallback() -> tuple[np.ndarray, dict]:
         # The two phases are not separable by timing alone. Fall back to a
         # strict alternation, but still let the spectral/amplitude evidence
-        # choose WHICH phase is S1 -- that is exactly the high-heart-rate case
-        # where timing is ambiguous and the old code always guessed "first
-        # event is S1".
+        # choose WHICH phase is S1.
         fallback_amplitude = (
             np.asarray(amplitudes, dtype=np.float64)
             if amplitudes is not None and len(amplitudes) == n
@@ -334,12 +446,36 @@ def label_events_sequential(
         return label_events(
             times, fallback_amplitude, zcr=zcr, config=config
         ), {
-            **empty_info,
+            **base_info,
             "systole_est_s": short,
             "diastole_est_s": long,
-            "label_separation": separation,
             "labeler": "sequential-fallback",
         }
+
+    clusters_usable = bool(np.isfinite(separation) and short > 0)
+    if not prior_active and not clusters_usable:
+        return fallback()
+
+    if prior_active:
+        if config.gap_prior == "model":
+            expected_systole, expected_diastole = prior_systole, prior_diastole
+        else:
+            # The observed clusters keep the recording's own durations; the
+            # regression only decides which cluster is the systole.
+            if prior_systole >= prior_diastole:
+                expected_systole, expected_diastole = long, short
+            else:
+                expected_systole, expected_diastole = short, long
+        labeler_name = "sequential-prior"
+    else:
+        if separation < config.min_gap_separation:
+            return fallback()
+        expected_systole, expected_diastole = short, long
+        labeler_name = "sequential"
+
+    if not (expected_systole > 0 and expected_diastole > 0):
+        base_info["prior_active"] = False
+        return fallback()
 
     # Unary evidence: S1 is usually lower-frequency than S2, and often louder
     # at the auscultation site. Both are weak, recording-dependent cues, so they
@@ -364,13 +500,13 @@ def label_events_sequential(
     back = np.zeros((n, 2), dtype=np.int8)
     cost[0] = (unary[0, 0], unary[0, 1])
 
-    two_phases = short + long
+    two_phases = expected_systole + expected_diastole
 
     def step(g: float, from_state: int, to_state: int) -> float:
         if from_state == 0 and to_state == 1:      # S1 -> S2 is systole
-            return ((g - short) / short) ** 2
+            return ((g - expected_systole) / expected_systole) ** 2
         if from_state == 1 and to_state == 0:      # S2 -> S1 is diastole
-            return ((g - long) / long) ** 2
+            return ((g - expected_diastole) / expected_diastole) ** 2
         # Same label twice means one beat was missed between them, so the gap
         # should span a whole cycle. Charging the gap (instead of a flat
         # penalty) is what stops the optimiser from "fixing" a single missed
@@ -395,10 +531,10 @@ def label_events_sequential(
         labels[i] = S1 if state == 0 else S2
         state = int(back[i, state])
     return labels, {
-        "labeler": "sequential",
-        "systole_est_s": short,
-        "diastole_est_s": long,
-        "label_separation": separation,
+        **base_info,
+        "labeler": labeler_name,
+        "systole_est_s": expected_systole,
+        "diastole_est_s": expected_diastole,
     }
 
 

@@ -10,6 +10,18 @@ flashing. See "What is real vs stubbed" below before quoting this as working.
 
 ---
 
+## 输出契约
+
+本固件必须遵守 `docs/mvp-output-contract.md`：
+
+- **波形**是权威输出；当前 stub 只做 320 列 min/max 包络。
+- **杂音分数**在推理接入后才出现，且必须带"筛查提示，非诊断"字样；当前 `ai_stub_infer()`
+  明确返回 `NOT_IMPLEMENTED`，显示层显示 `murmur: n/a (no model)`，不得伪造分数。
+- **心率**尚未移植到 C；移植后只能以"估算"字样显示，不进报告、不用于报警
+  （实测中位误差 1.2 bpm，但 13.5% 录音粗错）。
+- **S1/S2 不进 MVP**：嵌套患者级 F1 0.7975、高心率互换 0.273、139/516 条反相。
+- 不得出现疾病诊断、杂音分级、位置/放射方向等超出 ADR-008 的结论。
+
 ## 1. ESP-IDF environment
 
 Installed outside the repository (the repo's own CMake build must keep working

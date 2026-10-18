@@ -27,12 +27,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "ai"))
 import cross_validate
 from hs_splits import (
     DEFAULT_N_FOLDS,
+    FROZEN_CACHE_KEY_FIELDS,
+    apply_frozen_split,
     DEFAULT_SEED,
     fold_label_counts,
     fold_sets,
+    frozen_split_cache_key,
     load_splits,
     patient_folds,
     seed_protocol,
+    split_cache_key,
+    split_cache_matches,
     splits_fingerprint,
     validate_splits,
     write_splits,
@@ -616,6 +621,204 @@ def _count_labels(rows: list[dict]) -> dict[str, int]:
     for row in rows:
         counts[row["label"]] = counts.get(row["label"], 0) + 1
     return counts
+
+
+class FrozenRunSplitTests(unittest.TestCase):
+    """apply_frozen_split: one fold as test, the rest split by the CV rule."""
+
+    def make_rows(self):
+        labels = {f"s{i:02d}": i % 2 for i in range(20)}
+        folds = patient_folds(labels, 5, DEFAULT_SEED)
+        rows = [
+            {"subject_id": subject, "label": str(label), "wav_path": f"/x/{subject}.wav"}
+            for subject, label in labels.items()
+        ]
+        return rows, labels, folds
+
+    def write_splits(self, tmpdir, labels, folds):
+        path = Path(tmpdir) / "splits.csv"
+        write_splits(path, folds, labels, {"seed": DEFAULT_SEED})
+        return path
+
+    def test_fold_subjects_become_the_test_set(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, labels, folds = self.make_rows()
+            path = self.write_splits(tmpdir, labels, folds)
+            split_rows, provenance = apply_frozen_split(rows, path, 2, 0.15, DEFAULT_SEED)
+            test_subjects = {r["subject_id"] for r in split_rows if r["split"] == "test"}
+            self.assertEqual(test_subjects, {s for s, f in folds.items() if f == 2})
+            self.assertEqual(provenance["fold"], 2)
+            self.assertEqual(provenance["fingerprint"], splits_fingerprint(folds))
+
+    def test_train_val_matches_cross_validate_rule(self) -> None:
+        from cross_validate import split_train_val
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, labels, folds = self.make_rows()
+            path = self.write_splits(tmpdir, labels, folds)
+            split_rows, _ = apply_frozen_split(rows, path, 1, 0.15, DEFAULT_SEED)
+            produced = {
+                split: {r["subject_id"] for r in split_rows if r["split"] == split}
+                for split in ("train", "val", "test")
+            }
+            pool = {s for s in labels if s not in produced["test"]}
+            expected_train, expected_val = split_train_val(
+                pool, labels, 0.15, DEFAULT_SEED + 1
+            )
+            self.assertEqual(produced["train"], expected_train)
+            self.assertEqual(produced["val"], expected_val)
+
+    def test_missing_subject_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, labels, folds = self.make_rows()
+            path = self.write_splits(tmpdir, labels, folds)
+            extra = rows + [{"subject_id": "not_in_file", "label": "1", "wav_path": "/x"}]
+            with self.assertRaises(SystemExit):
+                apply_frozen_split(extra, path, 0, 0.15, DEFAULT_SEED)
+
+    def test_empty_fold_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, labels, folds = self.make_rows()
+            path = self.write_splits(tmpdir, labels, folds)
+            with self.assertRaises(SystemExit):
+                apply_frozen_split(rows, path, 99, 0.15, DEFAULT_SEED)
+
+
+class FrozenCacheKeyTests(unittest.TestCase):
+    """The window-cache key must identify the split, not just the file path.
+
+    ``train_cnn.py`` reuses ``data/processed/<dataset>/windows-*.npy`` when the
+    recorded provenance "matches" the requested split.  Before this key existed
+    the comparison was ``kind`` + ``path`` + ``fold`` only, so a ``splits.csv``
+    re-frozen in place was silently paired with windows built for the *old*
+    assignment and the report cited a fingerprint the file no longer had.
+    These tests pin the fingerprint (i.e. the content) into the key.
+    """
+
+    def make_case(self, tmpdir):
+        labels = {f"s{index:02d}": index % 2 for index in range(20)}
+        folds = patient_folds(labels, DEFAULT_N_FOLDS, DEFAULT_SEED)
+        rows = [
+            {"subject_id": subject, "label": str(label), "wav_path": f"/x/{subject}.wav"}
+            for subject, label in labels.items()
+        ]
+        path = Path(tmpdir) / "splits.csv"
+        write_splits(path, folds, labels, {"seed": DEFAULT_SEED})
+        return rows, labels, folds, path
+
+    def test_key_is_complete_and_derives_val_seed_from_seed_plus_fold(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _, _, folds, path = self.make_case(tmpdir)
+            key = frozen_split_cache_key(path, 3, 0.15, DEFAULT_SEED)
+            self.assertEqual(set(key), set(FROZEN_CACHE_KEY_FIELDS))
+            self.assertEqual(key["fingerprint"], splits_fingerprint(folds))
+            self.assertEqual(key["fold"], 3)
+            self.assertEqual(key["val_split_seed"], DEFAULT_SEED + 3)
+            self.assertEqual(key["val_ratio"], 0.15)
+
+    def test_provenance_key_equals_requested_key(self) -> None:
+        """Report provenance and cache key must never drift apart."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, _, _, path = self.make_case(tmpdir)
+            _, provenance = apply_frozen_split(rows, path, 2, 0.15, DEFAULT_SEED)
+            self.assertEqual(
+                split_cache_key(provenance),
+                frozen_split_cache_key(path, 2, 0.15, DEFAULT_SEED),
+            )
+
+    def test_refrozen_file_at_same_path_invalidates_the_cache(self) -> None:
+        """Same path, same fold, different assignment -> different key."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, labels, folds, path = self.make_case(tmpdir)
+            _, provenance = apply_frozen_split(rows, path, 0, 0.15, DEFAULT_SEED)
+            rotated = {subject: (fold + 1) % DEFAULT_N_FOLDS for subject, fold in folds.items()}
+            write_splits(path, rotated, labels, {"seed": DEFAULT_SEED})
+            # the path and fold index are unchanged; only the content moved
+            self.assertEqual(provenance["path"], str(path))
+            self.assertEqual(provenance["fold"], 0)
+            requested = frozen_split_cache_key(path, 0, 0.15, DEFAULT_SEED)
+            self.assertNotEqual(
+                provenance["fingerprint"],
+                requested["fingerprint"],
+                "rotating every fold must change the fingerprint",
+            )
+            self.assertFalse(split_cache_matches(provenance, requested))
+
+    def test_reusing_the_unchanged_file_still_hits(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, _, _, path = self.make_case(tmpdir)
+            _, provenance = apply_frozen_split(rows, path, 1, 0.15, DEFAULT_SEED)
+            requested = frozen_split_cache_key(path, 1, 0.15, DEFAULT_SEED)
+            self.assertTrue(split_cache_matches(provenance, requested))
+
+    def test_fold_change_invalidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, _, _, path = self.make_case(tmpdir)
+            _, provenance = apply_frozen_split(rows, path, 0, 0.15, DEFAULT_SEED)
+            requested = frozen_split_cache_key(path, 1, 0.15, DEFAULT_SEED)
+            self.assertFalse(split_cache_matches(provenance, requested))
+
+    def test_train_val_carve_change_invalidates(self) -> None:
+        """A different carve seed/ratio moves subjects between train and val."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, _, _, path = self.make_case(tmpdir)
+            _, provenance = apply_frozen_split(rows, path, 0, 0.15, DEFAULT_SEED)
+            other_seed = frozen_split_cache_key(path, 0, 0.15, DEFAULT_SEED + 1)
+            other_ratio = frozen_split_cache_key(path, 0, 0.25, DEFAULT_SEED)
+            self.assertFalse(split_cache_matches(provenance, other_seed))
+            self.assertFalse(split_cache_matches(provenance, other_ratio))
+
+    def test_legacy_split_provenance_still_reuses_its_cache(self) -> None:
+        """Default runs keep the pre-existing hit/miss behaviour."""
+        legacy = {"kind": "prepare_circor_split"}
+        self.assertTrue(split_cache_matches(legacy, {"kind": "prepare_circor_split"}))
+        self.assertTrue(split_cache_matches(legacy, split_cache_key(legacy)))
+
+    def test_legacy_and_frozen_provenance_never_match_each_other(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows, _, _, path = self.make_case(tmpdir)
+            _, provenance = apply_frozen_split(rows, path, 0, 0.15, DEFAULT_SEED)
+            legacy = {"kind": "prepare_circor_split"}
+            self.assertFalse(split_cache_matches(legacy, split_cache_key(provenance)))
+            self.assertFalse(split_cache_matches(provenance, {"kind": "prepare_circor_split"}))
+
+    def test_incomplete_provenance_is_never_trusted(self) -> None:
+        """A cache that cannot prove its split must be rebuilt, not reused."""
+        expected = {"kind": "prepare_circor_split"}
+        for recorded in (None, {}, {"kind": "unknown"}, {"kind": "frozen_splits_file"}):
+            self.assertFalse(split_cache_matches(recorded, expected), msg=repr(recorded))
+        frozen_expected = {
+            "kind": "frozen_splits_file",
+            "path": "x",
+            "fold": 0,
+            "fingerprint": "f" * 64,
+            "val_split_seed": 1,
+            "val_ratio": 0.15,
+        }
+        for recorded in (
+            None,
+            {},
+            # frozen kind, but no fingerprint / no val_split block
+            {"kind": "frozen_splits_file", "path": "x", "fold": 0},
+            {"kind": "frozen_splits_file", "path": "x", "fold": 0,
+             "fingerprint": "f" * 64, "val_split": None},
+            {"kind": "frozen_splits_file", "path": "x", "fold": 0,
+             "fingerprint": "f" * 64, "val_split": {"seed": "not-an-int"}},
+        ):
+            self.assertFalse(
+                split_cache_matches(recorded, frozen_expected), msg=repr(recorded)
+            )
+
+    def test_provenance_with_unreadable_value_is_not_trusted(self) -> None:
+        recorded = {
+            "kind": "frozen_splits_file",
+            "path": "x",
+            "fold": "zero",
+            "fingerprint": "f" * 64,
+            "val_split": {"seed": 1, "val_ratio": 0.15},
+        }
+        self.assertIsNone(split_cache_key(recorded))
+        self.assertFalse(split_cache_matches(recorded, {"kind": "frozen_splits_file"}))
 
 
 if __name__ == "__main__":

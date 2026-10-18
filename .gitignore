@@ -11,6 +11,7 @@ __pycache__/
 Thumbs.db
 desktop.ini
 build/
+build-*/
 data/
 .venv/
 *.pt
