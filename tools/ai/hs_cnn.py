@@ -290,12 +290,68 @@ def measure_latency(model: nn.Module, input_length: int = 8000, runs: int = 200,
     }
 
 
-def export_onnx(model: nn.Module, output_path: Path, input_length: int = 8000) -> None:
+class NormalizationFreeCNN(nn.Module):
+    """``Small1DCNN`` body with the input standardization removed.
+
+    ``Small1DCNN.forward`` standardizes each window (subtract mean, divide by
+    std) before the convolutions. That is three ``ReduceMean`` nodes, a ``Sub``,
+    a ``Div`` and a ``Sqrt`` in the exported graph - arithmetic an MCU integer
+    kernel set does not necessarily provide, and a per-window pass over 8000
+    samples that the host can do in integer code far more cheaply.
+
+    Wrapping the trained model this way keeps the weights identical and moves
+    the standardization to the caller. ``normalize_window`` below is the
+    reference implementation the device must reproduce.
+    """
+
+    def __init__(self, model: "Small1DCNN") -> None:
+        super().__init__()
+        self.model = model
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.dim() == 2:
+            x = x.unsqueeze(1)
+        features = self.model.features(x)
+        pooled = self.model.pool(features).squeeze(-1)
+        return self.model.classifier(pooled).squeeze(-1)
+
+
+def normalize_window(windows: np.ndarray, epsilon: float = 1e-6) -> np.ndarray:
+    """Reference input standardization, shared by the exporter and the tests.
+
+    ``windows`` is ``[n, samples]`` or ``[n, 1, samples]``; returns the same
+    shape as float32. The device must reproduce this with ``mean`` and
+    ``std`` over the window (population std, as ``numpy.std`` / ``torch.std``
+    use by default here).
+    """
+    array = np.asarray(windows, dtype=np.float32)
+    mean = array.mean(axis=-1, keepdims=True)
+    std = array.std(axis=-1, keepdims=True)
+    return (array - mean) / (std + epsilon)
+
+
+def export_onnx(
+    model: nn.Module,
+    output_path: Path,
+    input_length: int = 8000,
+    *,
+    include_normalization: bool = True,
+) -> None:
+    """Export to ONNX.
+
+    ``include_normalization=False`` exports the body only (see
+    :class:`NormalizationFreeCNN`), which is the deployment form: the caller
+    standardizes the window with :func:`normalize_window` semantics before
+    feeding it. The default keeps the historical behaviour so existing reports
+    stay reproducible.
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     model.eval()
+    exported = model if include_normalization else NormalizationFreeCNN(model)
+    exported.eval()
     dummy = torch.zeros(1, input_length)
     torch.onnx.export(
-        model,
+        exported,
         dummy,
         str(output_path),
         input_names=["waveform"],
