@@ -56,6 +56,7 @@
 #include "ai_stub.h"
 #include "app_pipeline.h"
 #include "ble_central.h"
+#include "display_st7789.h"
 #include "display_stub.h"
 #include "hr_detector.h"
 
@@ -396,7 +397,7 @@ void app_main(void)
     /*
      * Order matters:
      *   1. pipeline  - the BLE callback may fire as soon as the host task runs
-     *   2. display   - cheap, no dependency
+     *   2. display   - stub first; the optional panel is guarded and never fatal
      *   3. AI        - logs the contract, allocates nothing
      *   4. HR        - binds the static work buffer, no malloc
      *   5. BLE       - starts the host task, which starts scanning
@@ -404,6 +405,23 @@ void app_main(void)
      */
     ESP_ERROR_CHECK(app_pipeline_init());
     ESP_ERROR_CHECK(display_stub_init());
+
+#if FYP_ENABLE_DISPLAY
+    /*
+     * Optional hardware panel (ADR-019). This is the only display_st7789 call
+     * in the firmware today: display_stub.c still owns the UI data path.
+     * display_init() never aborts; a board without a panel, wrong placeholder
+     * pins or a missing backlight must leave the BLE link, the pipeline and
+     * heart-rate detection running exactly as before.
+     */
+    esp_err_t display_err = display_init();
+    if (display_err != ESP_OK) {
+        ESP_LOGW(TAG, "ST7789 display unavailable (0x%x); continuing headless", display_err);
+    } else {
+        ESP_LOGI(TAG, "ST7789 display ready (%ux%d)", DISPLAY_H_RES, DISPLAY_V_RES);
+    }
+#endif
+
     ESP_ERROR_CHECK(ai_stub_init());
 
     if (hr_detector_init(&s_hr_detector, s_hr_work, HR_DETECTOR_WORK_FLOATS, NULL) !=
