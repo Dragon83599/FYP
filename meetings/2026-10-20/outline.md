@@ -1,6 +1,6 @@
 # 两周进展汇报 · PPT 大纲
 
-> 用途：明天组会用，约 15 分钟，12 页。
+> 用途：明天组会用，约 15 分钟，11 页。
 > 原则：每页一个观点；数字全部可追溯；失败与边界如实写。
 > 口径统一：模型精度一律用**患者级 AUROC 均值 ± 标准差**（同一协议），pooled 值放脚注。
 
@@ -24,20 +24,7 @@
 
 ---
 
-## 3. 系统架构与接口
-
-- 三段链路：探头固件 → BLE 传输 → 主机接收/推理/显示
-- 关键接口已冻结：
-  - LKA1：20 B 头 + 负载 + CRC16
-  - AUD1：352 B 帧（30 B 头 + 320 B PCM + 2 B CRC），20 ms = 160 采样 @ 8 kHz
-  - ATT MTU 247、2M PHY
-- 端到端链路已有 5 项 C 测试，真实数据最大差 0.84 bpm
-
-> 讲法：强调"接口先冻结再写代码"，这是后面所有并行工作的前提。
-
----
-
-## 4. 数据与评估方法
+## 3. 数据与评估方法
 
 - CirCor 1.0.3：942 人 / 3163 条录音；有杂音标注 874 人（阳性 179）
 - **患者级 5 折**，划分文件冻结，指纹 `1f212dea…`
@@ -48,7 +35,7 @@
 
 ---
 
-## 5. 主结果：三臂对比
+## 4. 主结果：三臂对比
 
 | 模型 | 患者级 AUROC | 说明 |
 | --- | ---: | --- |
@@ -63,7 +50,7 @@
 
 ---
 
-## 6. 校准与工作点
+## 5. 校准与工作点
 
 - 原始概率**过度自信**：ECE 0.22–0.24，校准斜率 1.2–2.1
 - Platt 校准后：**ECE → 0.04**，Brier 0.17 → 0.11
@@ -75,7 +62,7 @@
 
 ---
 
-## 7. 容量研究：更大的模型值得吗
+## 6. 容量研究：更大的模型值得吗
 
 | 模型 | 参数 | 患者级 AUROC | pooled |
 | --- | ---: | ---: | ---: |
@@ -91,7 +78,7 @@
 
 ---
 
-## 8. 决策页：模型与平台怎么选（对比页）
+## 7. 决策页：模型与平台怎么选（对比页）
 
 | 候选 | FP32 AUROC | INT8 AUROC | INT8 体积 | 功耗/启动 | 结论 |
 | --- | ---: | ---: | ---: | --- | --- |
@@ -107,7 +94,7 @@
 
 ---
 
-## 9. INT8 真相：论文模型 ≠ 设备模型
+## 8. INT8 真相：论文模型 ≠ 设备模型
 
 - 所有论文数字都是 FP32，而固件跑 INT8
 - 首次实测：平均掉 **0.0937**，最差折 **0.2598**（远超 0.03 判据）
@@ -119,7 +106,7 @@
 
 ---
 
-## 10. 泛化验证：增益从哪来
+## 9. 泛化验证：增益从哪来
 
 - 跨中心（CC2014 ↔ CC2015）：
   - 小 CNN 0.773，TCN **0.903** → TCN 更抗域偏移
@@ -131,7 +118,7 @@
 
 ---
 
-## 11. 心率与 S1/S2：两个诚实的失败
+## 10. 心率与 S1/S2：两个诚实的失败
 
 - 心率（设备条件）：中位误差 1.19 bpm，但 MAE 6.79、**13.5% 粗错**、设备条件 MAE 8.14
   - → 只作"估算值"显示，不写进报告
@@ -143,7 +130,7 @@
 
 ---
 
-## 12. 边界与下一步
+## 11. 边界与下一步
 
 - 已知边界：
   - **没有任何上板数据**（时延、电流、堆、屏幕）
@@ -162,10 +149,10 @@
 
 | 页 | 证据 |
 | --- | --- |
-| 4、5 | `data/reports/circor-cv-*/report.json` |
-| 6 | `data/reports/workpoint-summary.md` |
-| 7 | `data/reports/circor-large-model/report.md`、`data/reports/circor-seed-replication/REPORT.md` |
-| 8 | ADR-006 / ADR-017 / ADR-007 补充 |
-| 9 | `data/reports/int8-cv-v2/summary.md`、`data/reports/tcn-int8/` |
-| 10 | `data/reports/circor-generalisation/report.md`、`data/reports/circor-outcome-942/report.md` |
-| 11 | `data/reports/heart-rate-circor.json`、ADR-008 |
+| 3、4 | `data/reports/circor-cv-*/report.json` |
+| 5 | `data/reports/workpoint-summary.md` |
+| 6 | `data/reports/circor-large-model/report.md`、`data/reports/circor-seed-replication/REPORT.md` |
+| 7 | ADR-006 / ADR-017 / ADR-007 补充 |
+| 8 | `data/reports/int8-cv-v2/summary.md`、`data/reports/tcn-int8/` |
+| 9 | `data/reports/circor-generalisation/report.md`、`data/reports/circor-outcome-942/report.md` |
+| 10 | `data/reports/heart-rate-circor.json`、ADR-008 |
