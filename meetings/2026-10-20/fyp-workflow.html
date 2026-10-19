@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FYP 全流程任务清单 · 无线心音听诊器（P0–P8）</title>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#fff; --ink:#1b1f23; --muted:#5b6570; --line:#dfe3e8;
+  --wo:#0b5ed7; --wo-bg:#e7f0ff; --mate:#9a5b00; --mate-bg:#fff1dc;
+  --joint:#6f42c1; --joint-bg:#f0e9ff;
+  --done:#146c43; --done-bg:#d8efdf; --doing:#8a6100; --doing-bg:#fff3cd;
+  --todo:#495057; --todo-bg:#eceef1; --blocked:#b02a37; --blocked-bg:#f9dadd;
+  --star:#b3005e;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.55 "Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,-apple-system,sans-serif}
+h1{font-size:1.42rem;margin:0 0 .35rem;line-height:1.3}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  font-size:.86em;background:#f1f3f5;border:1px solid #e2e6ea;border-radius:3px;padding:0 3px;
+  word-break:break-word}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header.page{background:var(--card);border-bottom:1px solid var(--line);padding:20px 0 14px}
+.meta-line{color:var(--muted);font-size:.87rem;margin:.15rem 0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:.82rem;margin:.6rem 0 .1rem}
+.legend .cap{color:var(--muted)}
+.badge{display:inline-block;border-radius:999px;padding:1px 8px;font-size:.76rem;font-weight:600;
+  white-space:nowrap;border:1px solid transparent;line-height:1.5}
+.owner-wo{color:var(--wo);background:var(--wo-bg);border-color:#c5daff}
+.owner-mate{color:var(--mate);background:var(--mate-bg);border-color:#f0d3a4}
+.owner-joint{color:var(--joint);background:var(--joint-bg);border-color:#d9ccff}
+.st-done{color:var(--done);background:var(--done-bg);border-color:#b3ddc4}
+.st-doing{color:var(--doing);background:var(--doing-bg);border-color:#f0dca0}
+.st-todo{color:var(--todo);background:var(--todo-bg);border-color:#d3d8dd}
+.st-blocked{color:var(--blocked);background:var(--blocked-bg);border-color:#f0b7bd}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+button{font:inherit;font-size:.86rem;padding:6px 14px;border-radius:6px;border:1px solid #c3c9d0;
+  background:#fff;color:var(--ink);cursor:pointer}
+button:hover{background:#f1f3f5}
+button.primary{border-color:var(--wo);color:var(--wo)}
+button.danger{border-color:#c98d93;color:var(--blocked)}
+#save-state{font-size:.8rem;color:var(--muted);align-self:center;margin-left:2px}
+.sticky{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);
+  padding:10px 0 9px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.overall{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.overall .label{font-weight:700;font-size:.92rem}
+.overall .nums{font-size:.92rem;font-variant-numeric:tabular-nums}
+.overall .bar{flex:1 1 240px}
+.bar{display:block;position:relative;height:10px;background:#e6e9ed;border-radius:999px;overflow:hidden}
+.bar .fill{display:block;height:100%;background:#2f9e5f;border-radius:999px}
+.pbar{height:8px;flex:1 1 120px;max-width:340px}
+.phase{background:var(--card);border:1px solid var(--line);border-radius:9px;margin:14px 0;overflow:hidden}
+.phase summary{display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;padding:12px 15px;
+  cursor:pointer;list-style:none;background:#fbfcfd}
+.phase summary::-webkit-details-marker{display:none}
+.phase summary::before{content:"▸";color:var(--muted);font-size:.85rem;width:.9rem}
+.phase details[open] > summary::before{content:"▾"}
+.pname{font-weight:700;font-size:1rem}
+.pcount{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.rows{padding:0 15px 12px}
+.task{display:grid;grid-template-columns:1.35rem 1fr;gap:0 8px;padding:9px 0;border-top:1px solid var(--line)}
+.rows .task:first-child{border-top:0}
+.tick{width:1.05rem;height:1.05rem;margin:.15rem 0 0;accent-color:#2f9e5f;cursor:pointer}
+.body{display:block;min-width:0;cursor:pointer}
+.head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.tid{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.8rem;font-weight:700;
+  color:#334;background:#eef1f4;border-radius:3px;padding:0 4px}
+.tname{font-weight:600;font-size:.94rem}
+.meta{display:block;font-size:.8rem;color:var(--muted);margin-top:1px;overflow-wrap:anywhere}
+.meta .k{display:inline-block;min-width:2.1em;color:#8a939c;font-weight:600}
+.meta .v{color:#4a545e}
+.print-mark{display:none}
+.cm{color:var(--star);font-size:.9rem;line-height:1;font-weight:700}
+.task.crit .tid{background:#ffe1ef;color:#8a0047;border:1px solid #f7b6d2}
+.crit-line{background:#fff6fa;border:1px solid #f7cfe0;border-radius:6px;padding:7px 10px;font-size:.83rem;color:#5c2739}
+.task.done .tname{color:#2c4a38}
+.task.done .tick{background:#2f9e5f}
+.task.blocked{border-left:3px solid var(--blocked);padding-left:8px;margin-left:-11px}
+footer{color:var(--muted);font-size:.8rem;padding:18px 0 34px;text-align:center}
+.print-only{display:none}
+.hint{font-size:.8rem;color:var(--muted);margin:.35rem 0 0}
+@media (max-width:640px){
+  body{font-size:14px}
+  header.page{padding:14px 0 10px}
+  h1{font-size:1.15rem}
+  .wrap{padding:0 11px}
+  .rows{padding:0 11px 10px}
+  .phase summary{padding:10px 11px;gap:4px 8px}
+  .pbar{flex-basis:100%;max-width:none}
+  .task{grid-template-columns:1.35rem 1fr}
+  .tname{width:100%}
+  .meta .k{min-width:0;margin-right:4px}
+  .sticky{padding:8px 0}
+  .overall .bar{flex-basis:100%}
+}
+@media print{
+  :root{--bg:#fff;--muted:#333;--line:#bbb}
+  body{background:#fff;font-size:10.5pt}
+  .sticky,.actions,.hint,footer{display:none!important}
+  header.page{border-bottom:1.5pt solid #000;padding:0 0 6pt}
+  .wrap{max-width:none;padding:0}
+  .print-only{display:block;font-size:9.5pt;margin-top:4pt}
+  .phase{border:1pt solid #999;break-inside:auto;margin:8pt 0;border-radius:0}
+  .phase summary{background:#fff;padding:5pt 7pt;font-weight:700}
+  .phase summary::before{content:""}
+  .rows{padding:0 7pt 5pt}
+  .task{break-inside:avoid;padding:3.5pt 0;border-top:1px solid #ccc}
+  .tick{display:none}
+  .print-mark{display:inline-block;width:1.1em;font-weight:700;color:#000}
+  .cm{color:#000}
+  .crit-line{border:1px solid #000;background:#fff;color:#000}
+  .task.done .print-mark::before{content:"\2611"}   /* ballot box with check */
+  .task:not(.done) .print-mark::before{content:"\2610"} /* empty ballot box */
+  .badge{border:1px solid #555!important;background:#fff!important;color:#000!important}
+  .meta{font-size:8.6pt;color:#222}
+  .meta .v{color:#222}
+  code{background:#f4f4f4;border-color:#ccc}
+  a{color:#000;text-decoration:none}
+  .badge.st-blocked{font-weight:700}
+}
+</style>
+</head>
+<body>
+<header class="page">
+  <div class="wrap">
+    <h1>无线心音听诊器 · FYP 全流程任务清单</h1>
+    <p class="meta-line">P0–P8 · 89 项任务 · 页面日期 2026-10-20 · 状态数据截止 2026-10-19 交接</p>
+    <p class="meta-line">同源文档：<code>docs/fyp-overall-workflow.md</code>（图 + 表）· 本页只负责勾选进度</p>
+    <div class="legend"><span class="cap">图例</span><span class="cm">★</span><span class="cap">关键路径</span><span class="cap">负责人</span><span class="badge owner-wo">我</span><span class="badge owner-mate">队友</span><span class="badge owner-joint">共同</span><span class="cap">状态</span><span class="badge st-done">已完成</span><span class="badge st-doing">进行中</span><span class="badge st-todo">未开始</span><span class="badge st-blocked">阻塞·队友</span><span class="cap">勾选＝个人进度，只存在本机浏览器</span></div>
+    <p class="crit-line"><b>关键路径</b>：P7-T1 采购预审批 → P7-T2 下单 → P7-T3 到货烧录 → P7-T10 显示驱动 → P7-T11 AI 集成 → P7-T14 上板 11 项 → P8-T6 论文工程章。两条支路汇入：P6-T8 ESP-DL 转换 → P7-T11；P1-T7 GATT 冻结 → P1-T9 COMMAND → P7-T7 控制通路 → P7-T14。<br><b>当前三个卡点</b>：① 开发板未采购（P7-T1/T2）；② 队友未确认 MTU 与 COMMAND（P1-T7/T8/T9）；③ ESP-DL/TFLM 未集成（P6-T8 → P7-T11）。</p>
+    <div class="actions">
+      <button type="button" class="primary" id="btn-export">导出进度 (JSON)</button>
+      <button type="button" class="danger" id="btn-reset">重置</button>
+      <span id="save-state" role="status" aria-live="polite"></span>
+    </div>
+    <p class="hint">首次打开时，"已完成"的任务已预先打勾（56 项）。取消勾选或补勾都会写入 localStorage：<code>fyp-workflow-v1</code>。</p>
+    <p class="print-only">打印件：☑ = 已勾选，☐ = 未勾选。状态列反映 2026-10-19 仓库记录，勾选列为个人进度。</p>
+  </div>
+</header>
+
+<div class="sticky">
+  <div class="wrap overall">
+    <span class="label">总进度</span>
+    <span class="nums" id="overall-text">已完成 56 / 89（63%）</span>
+    <span class="bar" id="overall-bar"><span class="fill" id="overall-fill" style="width:63%"></span></span>
+  </div>
+</div>
+
+<main class="wrap">
+<section class="phase" id="phase-P0" data-phase="P0" data-total="8">
+  <details open>
+    <summary>
+      <span class="pname">P0 立项与需求</span>
+      <span class="pcount"><b class="pticked">7</b> / 8</span>
+      <span class="bar pbar" role="img" aria-label="7/8"><span class="fill" style="width:88%"></span></span>
+    </summary>
+    <div class="rows">
+<div class="task done" data-id="P0-T1" data-phase="P0" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P0-T1" aria-label="P0-T1 原始需求与导师白板归档" checked>
+  <label class="body" for="c-P0-T1">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P0-T1</span>
+      <span class="tname">原始需求与导师白板归档</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>assets/fyp-original-requirements.jpg</code>、<code>assets/fyp-supervisor-whiteboard.jpg</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">两份原始材料入库，需求条目可逐条回溯</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">—</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P0-T2" data-phase="P0" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P0-T2" aria-label="P0-T2 产品形态对比与二体式决策" checked>
+  <label class="body" for="c-P0-T2">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P0-T2</span>
+      <span class="tname">产品形态对比与二体式决策</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">ADR-001；<code>docs/group-meeting-2026-10-06-decisions.md</code> §1</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">一体式/有线二体/无线二体三方案均有对比，组会确认二体</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P0-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P0-T3" data-phase="P0" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P0-T3" aria-label="P0-T3 两段链路拓扑（A: BLE，B: Wi-Fi）" checked>
+  <label class="body" for="c-P0-T3">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P0-T3</span>
+      <span class="tname">两段链路拓扑（A: BLE，B: Wi-Fi）</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">ADR-003、ADR-004；<code>docs/connectivity-topology.md</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">两段链路的制式、角色、吞吐下限写入拓扑文档</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P0-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P0-T4" data-phase="P0" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P0-T4" aria-label="P0-T4 信号带宽与采样率决策" checked>
+  <label class="body" for="c-P0-T4">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P0-T4</span>
+      <span class="tname">信号带宽与采样率决策</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">ADR-002；<code>docs/phase0-interface-freeze.md</code> §3</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">20–1000 Hz / 8 kHz 采集 / 4 kHz 推理三值冻结（实测见 P7-T13）</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P0-T3</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P0-T5" data-phase="P0" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P0-T5" aria-label="P0-T5 范围契约（必须/应该/不做）" checked>
+  <label class="body" for="c-P0-T5">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P0-T5</span>
+      <span class="tname">范围契约（必须/应该/不做）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/fyp-scope-and-sufficiency.md</code> §2</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">三类均有条目与证据出处；不做项含诊断、S1/S2 展示、树莓派、外移推理</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P0-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P0-T6" data-phase="P0" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P0-T6" aria-label="P0-T6 采购与报销流程归档" checked>
+  <label class="body" for="c-P0-T6">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P0-T6</span>
+      <span class="tname">采购与报销流程归档</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/reimbursement/README.md</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">预审批→采购→协调员→财务四步、¥1500 额度、CA2 截止日可查</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">—</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P0-T7" data-phase="P0" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P0-T7" aria-label="P0-T7 主机平台架构选型（ADR-006→ADR-017）" checked>
+  <label class="body" for="c-P0-T7">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P0-T7</span>
+      <span class="tname">主机平台架构选型（ADR-006→ADR-017）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">ADR-006、ADR-017</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">4 个候选按 RAM/算力/BLE 集成度/成本对比，结论 S3 N16R8</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P0-T4</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P0-T8" data-phase="P0" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P0-T8" aria-label="P0-T8 里程碑与答辩日期确认（倒排计划）">
+  <label class="body" for="c-P0-T8">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P0-T8</span>
+      <span class="tname">里程碑与答辩日期确认（倒排计划）</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认（仓库无日期记录；报销截止依赖 CA2 整体答辩首日，见 <code>docs/reimbursement/README.md</code>）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">中期/预答辩/CA2 日期与倒排里程碑写入仓库</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P0-T5</span></span>
+  </label>
+</div>
+    </div>
+  </details>
+</section>
+<section class="phase" id="phase-P1" data-phase="P1" data-total="12">
+  <details open>
+    <summary>
+      <span class="pname">P1 接口冻结</span>
+      <span class="pcount"><b class="pticked">6</b> / 12</span>
+      <span class="bar pbar" role="img" aria-label="6/12"><span class="fill" style="width:50%"></span></span>
+    </summary>
+    <div class="rows">
+<div class="task done" data-id="P1-T1" data-phase="P1" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P1-T1" aria-label="P1-T1 AUD1 帧冻结 + 黄金向量" checked>
+  <label class="body" for="c-P1-T1">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T1</span>
+      <span class="tname">AUD1 帧冻结 + 黄金向量</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>shared/include/audio_protocol.h</code>；<code>tests/test_audio_protocol.c</code>（golden frame，CRC <code>0x365E</code>）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">352 B 帧逐字节固定；header/CRC 黄金向量可复算</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P0-T4</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P1-T2" data-phase="P1" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P1-T2" aria-label="P1-T2 LKA1 分包/重组冻结 + 黄金包" checked>
+  <label class="body" for="c-P1-T2">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T2</span>
+      <span class="tname">LKA1 分包/重组冻结 + 黄金包</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>shared/include/link_a_protocol.h</code>；<code>tests/test_link_a_protocol.c</code>（golden packet）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">22 B 开销、222 B 分片；乱序/重复/丢片语义固定</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P1-T3" data-phase="P1" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P1-T3" aria-label="P1-T3 C/Node 双参考实现 + 零依赖模拟器" checked>
+  <label class="body" for="c-P1-T3">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T3</span>
+      <span class="tname">C/Node 双参考实现 + 零依赖模拟器</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>shared/src/*.c</code>；<code>tools/audio-sim/*</code>；<code>tests/node/*.test.mjs</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">两套实现对同一黄金包输出一致；<code>npm run sim:demo</code> 可跑</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T1、P1-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P1-T4" data-phase="P1" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P1-T4" aria-label="P1-T4 阶段 0 接口基线 v0.2" checked>
+  <label class="body" for="c-P1-T4">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T4</span>
+      <span class="tname">阶段 0 接口基线 v0.2</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/phase0-interface-freeze.md</code>（v0.2，§3–§7）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">采样率、帧长、端序、时间戳、序号语义成文</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T1、P1-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P1-T5" data-phase="P1" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P1-T5" aria-label="P1-T5 链路吞吐/延迟目标冻结" checked>
+  <label class="body" for="c-P1-T5">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T5</span>
+      <span class="tname">链路吞吐/延迟目标冻结</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">ADR-003；<code>docs/implementation-roadmap.md</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">≥320 kbps、P95 ≤15 ms 写进 ADR 与验收表，对 140.8 kbps 需求留 2× 余量</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P1-T6" data-phase="P1" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P1-T6" aria-label="P1-T6 GATT profile 候选 v1" checked>
+  <label class="body" for="c-P1-T6">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T6</span>
+      <span class="tname">GATT profile 候选 v1</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/link-a-gatt-profile.md</code>；ADR-010</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">4 个方案对比；UUID、特征、CCCD 顺序、绑定与重连成文（状态仍为候选）</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T4</span></span>
+  </label>
+</div>
+<div class="task blocked crit" data-id="P1-T7" data-phase="P1" data-status="阻塞（队友）" data-done="0">
+  <input class="tick" type="checkbox" id="c-P1-T7" aria-label="P1-T7 GATT profile 双端确认并冻结">
+  <label class="body" for="c-P1-T7">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P1-T7</span>
+      <span class="tname">GATT profile 双端确认并冻结</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-blocked">阻塞·队友</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/link-a-gatt-profile.md</code> §10；<code>docs/implementation-roadmap.md</code> 未勾选</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">队友书面确认 §10 全部 8 条，状态由候选改冻结</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T6</span></span>
+  </label>
+</div>
+<div class="task blocked" data-id="P1-T8" data-phase="P1" data-status="阻塞（队友）" data-done="0">
+  <input class="tick" type="checkbox" id="c-P1-T8" aria-label="P1-T8 ATT MTU 实测值确认（247 / 158）">
+  <label class="body" for="c-P1-T8">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T8</span>
+      <span class="tname">ATT MTU 实测值确认（247 / 158）</span>
+      <span class="badge owner-mate">队友</span>
+      <span class="badge st-blocked">阻塞·队友</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>firmware/main/ble_central.h</code> 现按 247 实现</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">实测值 + 模块型号入库；非 247 时重算分片数与缓冲</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T7</span></span>
+  </label>
+</div>
+<div class="task blocked crit" data-id="P1-T9" data-phase="P1" data-status="阻塞（队友）" data-done="0">
+  <input class="tick" type="checkbox" id="c-P1-T9" aria-label="P1-T9 `type=4 COMMAND`（START/STOP）定夺">
+  <label class="body" for="c-P1-T9">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P1-T9</span>
+      <span class="tname"><code>type=4 COMMAND</code>（START/STOP）定夺</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-blocked">阻塞·队友</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/link-a-gatt-profile.md</code> §5.1（候选向量）；<code>firmware/main/ble_central.c</code>（<code>START_FROZEN=0</code>）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">二选一书面定稿：升 LKA1 v1.1 或走独立 Control 帧；升版则补 C/Node 测试</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T7</span></span>
+  </label>
+</div>
+<div class="task blocked" data-id="P1-T10" data-phase="P1" data-status="阻塞（队友）" data-done="0">
+  <input class="tick" type="checkbox" id="c-P1-T10" aria-label="P1-T10 射频能力 + 连接参数 + 配对 IO 确认">
+  <label class="body" for="c-P1-T10">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T10</span>
+      <span class="tname">射频能力 + 连接参数 + 配对 IO 确认</span>
+      <span class="badge owner-mate">队友</span>
+      <span class="badge st-blocked">阻塞·队友</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>docs/link-a-gatt-profile.md</code> §3.2、§6</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">128-bit 服务、2 特征、2M PHY、DLE 251、Conn Param Update、Just Works 六项逐条有实测或 datasheet</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T7</span></span>
+  </label>
+</div>
+<div class="task blocked" data-id="P1-T11" data-phase="P1" data-status="阻塞（队友）" data-done="0">
+  <input class="tick" type="checkbox" id="c-P1-T11" aria-label="P1-T11 传感器 / 探头 MCU / ADC / 8 kHz 时钟选型">
+  <label class="body" for="c-P1-T11">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T11</span>
+      <span class="tname">传感器 / 探头 MCU / ADC / 8 kHz 时钟选型</span>
+      <span class="badge owner-mate">队友</span>
+      <span class="badge st-blocked">阻塞·队友</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>docs/phase0-interface-freeze.md</code> §8</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">型号、位数、参考电压、增益、抗混叠、时钟 ppm 全部落表</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T7</span></span>
+  </label>
+</div>
+<div class="task blocked" data-id="P1-T12" data-phase="P1" data-status="阻塞（队友）" data-done="0">
+  <input class="tick" type="checkbox" id="c-P1-T12" aria-label="P1-T12 阶段 0 完成证据 16 项全勾（G1）">
+  <label class="body" for="c-P1-T12">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P1-T12</span>
+      <span class="tname">阶段 0 完成证据 16 项全勾（G1）</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-blocked">阻塞·队友</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/phase0-interface-freeze.md</code> §8（16 项仍全未勾）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">§8 全部勾选，且两段链路实测记录在案</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T8、P1-T9、P1-T10、P1-T11</span></span>
+  </label>
+</div>
+    </div>
+  </details>
+</section>
+<section class="phase" id="phase-P2" data-phase="P2" data-total="11">
+  <details open>
+    <summary>
+      <span class="pname">P2 主机数据通路</span>
+      <span class="pcount"><b class="pticked">9</b> / 11</span>
+      <span class="bar pbar" role="img" aria-label="9/11"><span class="fill" style="width:82%"></span></span>
+    </summary>
+    <div class="rows">
+<div class="task done" data-id="P2-T1" data-phase="P2" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P2-T1" aria-label="P2-T1 纯 C 整数数据通路" checked>
+  <label class="body" for="c-P2-T1">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T1</span>
+      <span class="tname">纯 C 整数数据通路</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>shared/src/host_pipeline.c</code>；<code>shared/include/host_pipeline.h</code> D1–D7</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">重组/CRC/Q15 抽取/环形缓冲全程无动态分配、无浮点</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P2-T2" data-phase="P2" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P2-T2" aria-label="P2-T2 8 组 ctest 覆盖数据通路" checked>
+  <label class="body" for="c-P2-T2">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T2</span>
+      <span class="tname">8 组 ctest 覆盖数据通路</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tests/test_host_pipeline.c</code>（乱序、重复、坏 CRC、丢片、会话隔离、环形回绕、抽取器响应、确定性）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">8 组全绿；抽取器 440 Hz 增益 &gt;0.9、1900 Hz &lt;0.1</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P2-T3" data-phase="P2" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P2-T3" aria-label="P2-T3 端到端链路测试 + 真实数据一致性" checked>
+  <label class="body" for="c-P2-T3">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T3</span>
+      <span class="tname">端到端链路测试 + 真实数据一致性</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tests/test_end_to_end_chain.c</code>（5 组合成 + 真实数据）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">真实数据最大差 0.84 bpm；丢包与会话隔离用例通过</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T1、P2-T4</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P2-T4" data-phase="P2" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P2-T4" aria-label="P2-T4 心率检测器 C 移植" checked>
+  <label class="body" for="c-P2-T4">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T4</span>
+      <span class="tname">心率检测器 C 移植</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>shared/src/hr_detector.c</code>；<code>tests/test_hr_detector.c</code>；ADR-014 补充</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">召回 97.6%、精度 96.4%、|Δt| 中位 0.05 ms</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P2-T5" data-phase="P2" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P2-T5" aria-label="P2-T5 固件骨架构建通过" checked>
+  <label class="body" for="c-P2-T5">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T5</span>
+      <span class="tname">固件骨架构建通过</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>firmware/</code>；ADR-016；<code>firmware/README.md</code> §2</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">镜像 512,399 B、DIRAM 49.7%（余 171,781 B）、<code>main/</code> 无警告</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P2-T6" data-phase="P2" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P2-T6" aria-label="P2-T6 NimBLE central 实现" checked>
+  <label class="body" for="c-P2-T6">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T6</span>
+      <span class="tname">NimBLE central 实现</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>firmware/main/ble_central.c</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">MTU 先于 CCCD、单次 ATT 过程、重连 0.5/1/2/4 s 上限 30 s（空口未验，见 P7-T4）</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T5</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P2-T7" data-phase="P2" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P2-T7" aria-label="P2-T7 线程安全封装 + 心率接入固件" checked>
+  <label class="body" for="c-P2-T7">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T7</span>
+      <span class="tname">线程安全封装 + 心率接入固件</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>firmware/main/app_pipeline.c</code>、<code>app_main.c</code>；ADR-016 补充</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">单一 mutex、静态环；<code>HR ~&lt;bpm&gt;</code>/<code>HR --</code> 与窗口步长有 <code>_Static_assert</code> 绑定</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T6、P2-T4</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P2-T8" data-phase="P2" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P2-T8" aria-label="P2-T8 三套测试基线 + CI + 一键复现" checked>
+  <label class="body" for="c-P2-T8">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T8</span>
+      <span class="tname">三套测试基线 + CI + 一键复现</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>.github/workflows/ci.yml</code>；<code>scripts/reproduce.sh</code>；<code>docs/handoff-2026-10-19.md</code> §3</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">三套全绿（C 5 / Node 16 / Python 246）；<code>scripts/reproduce.sh --fast</code> 可复跑</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T2、P2-T3</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P2-T9" data-phase="P2" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P2-T9" aria-label="P2-T9 AI 调用点与占位契约" checked>
+  <label class="body" for="c-P2-T9">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T9</span>
+      <span class="tname">AI 调用点与占位契约</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>firmware/main/ai_stub.c</code>；<code>docs/mvp-output-contract.md</code> §4</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">明确返回 <code>NOT_IMPLEMENTED</code>、概率 −1，不伪造分数</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T7</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P2-T10" data-phase="P2" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P2-T10" aria-label="P2-T10 真实 BLE 模块验证 MTU/吞吐/P95/丢帧">
+  <label class="body" for="c-P2-T10">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T10</span>
+      <span class="tname">真实 BLE 模块验证 MTU/吞吐/P95/丢帧</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>docs/implementation-roadmap.md</code> 未勾选</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v"><code>link-a-gatt-profile.md</code> §9 第 2/4/5 项有实测记录</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T6、P1-T8、P7-T3</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P2-T11" data-phase="P2" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P2-T11" aria-label="P2-T11 C 协议库接入探头与主机（替换模拟器）">
+  <label class="body" for="c-P2-T11">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P2-T11</span>
+      <span class="tname">C 协议库接入探头与主机（替换模拟器）</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>docs/implementation-roadmap.md</code> 未勾选</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">探头发出真实 LKA1 帧、主机重组成功；模拟器不再是唯一数据源</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P2-T10、P1-T12</span></span>
+  </label>
+</div>
+    </div>
+  </details>
+</section>
+<section class="phase" id="phase-P3" data-phase="P3" data-total="8">
+  <details open>
+    <summary>
+      <span class="pname">P3 数据工程</span>
+      <span class="pcount"><b class="pticked">8</b> / 8</span>
+      <span class="bar pbar" role="img" aria-label="8/8"><span class="fill" style="width:100%"></span></span>
+    </summary>
+    <div class="rows">
+<div class="task done" data-id="P3-T1" data-phase="P3" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P3-T1" aria-label="P3-T1 CirCor 1.0.3 获取与官方校验" checked>
+  <label class="body" for="c-P3-T1">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P3-T1</span>
+      <span class="tname">CirCor 1.0.3 获取与官方校验</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/raw/circor</code>；<code>tools/ai/verify_circor.py</code>、<code>download_circor_parallel.mjs</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">942 人 / 3163 条；官方 SHA256 与 CRC 全部通过</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">—</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P3-T2" data-phase="P3" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P3-T2" aria-label="P3-T2 患者级索引与可训练队列" checked>
+  <label class="body" for="c-P3-T2">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P3-T2</span>
+      <span class="tname">患者级索引与可训练队列</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/prepare_circor.py</code>；<code>data/processed/circor/{subjects,recordings}.csv</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">可训练队列 874 人 / 3007 条（阳性 179）；未知标签单独成列</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P3-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P3-T3" data-phase="P3" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P3-T3" aria-label="P3-T3 患者级分层 5 折 + 冻结指纹 + 泄漏守卫" checked>
+  <label class="body" for="c-P3-T3">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P3-T3</span>
+      <span class="tname">患者级分层 5 折 + 冻结指纹 + 泄漏守卫</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/freeze_splits.py</code>、<code>hs_splits.py</code>；<code>data/processed/circor/splits-summary.json</code>（<code>1f212dea…</code>）；ADR-013</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">指纹可复算；缓存校验 fold/val_ratio/种子/指纹；无跨折患者</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P3-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P3-T4" data-phase="P3" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P3-T4" aria-label="P3-T4 分割标注解析与注释掩码" checked>
+  <label class="body" for="c-P3-T4">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P3-T4</span>
+      <span class="tname">分割标注解析与注释掩码</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/hs_segments.py</code>；ADR-015；<code>evaluate_s1s2.py --annotation-mask</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">只统计标注区间；覆盖率与被丢弃检出数进入报告</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P3-T3</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P3-T5" data-phase="P3" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P3-T5" aria-label="P3-T5 窗口策略对照（全部 vs 标注窗口）" checked>
+  <label class="body" for="c-P3-T5">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P3-T5</span>
+      <span class="tname">窗口策略对照（全部 vs 标注窗口）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/circor-cv-*/report.json</code>（六格）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">两策略同折同超参对比，"标注优先"结论可复现</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P3-T4</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P3-T6" data-phase="P3" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P3-T6" aria-label="P3-T6 特征管线（40 带 log-mel / MFCC+Δ）" checked>
+  <label class="body" for="c-P3-T6">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P3-T6</span>
+      <span class="tname">特征管线（40 带 log-mel / MFCC+Δ）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/hs_features.py</code>、<code>hs_mfcc.py</code>；<code>tests/python/test_hs_features.py</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">2 s / 4 kHz 带限窗；特征形状与数值有单测</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P3-T3</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P3-T7" data-phase="P3" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P3-T7" aria-label="P3-T7 派生 manifest：outcome 与 campaign" checked>
+  <label class="body" for="c-P3-T7">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P3-T7</span>
+      <span class="tname">派生 manifest：outcome 与 campaign</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/make_label_manifest.py</code>；<code>data/processed/circor-outcome/summary.json</code>（<code>71c0fd…</code>）；<code>data/processed/circor-campaign/summary.json</code>（<code>3fa1d8…</code>）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">两份派生集标签计数与指纹固定（486/456；695/179）</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P3-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P3-T8" data-phase="P3" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P3-T8" aria-label="P3-T8 合成 PCG 与同格式 S1/S2 真值" checked>
+  <label class="body" for="c-P3-T8">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P3-T8</span>
+      <span class="tname">合成 PCG 与同格式 S1/S2 真值</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/synthetic_pcg.py</code>；<code>tests/python/test_hs_s1s2.py</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">合成数据可生成，真值格式与 CirCor 一致</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P3-T4</span></span>
+  </label>
+</div>
+    </div>
+  </details>
+</section>
+<section class="phase" id="phase-P4" data-phase="P4" data-total="12">
+  <details open>
+    <summary>
+      <span class="pname">P4 模型与评估</span>
+      <span class="pcount"><b class="pticked">11</b> / 12</span>
+      <span class="bar pbar" role="img" aria-label="11/12"><span class="fill" style="width:92%"></span></span>
+    </summary>
+    <div class="rows">
+<div class="task done" data-id="P4-T1" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T1" aria-label="P4-T1 线性基线（40 带 log-mel + LR）" checked>
+  <label class="body" for="c-P4-T1">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T1</span>
+      <span class="tname">线性基线（40 带 log-mel + LR）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/train_baseline.py</code>；<code>data/reports/circor-cv-logreg-annotated/report.json</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">患者级 AUROC 0.789 ± 0.031</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P3-T5、P3-T6</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T2" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T2" aria-label="P4-T2 MFCC+Δ 第三臂" checked>
+  <label class="body" for="c-P4-T2">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T2</span>
+      <span class="tname">MFCC+Δ 第三臂</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/train_mfcc.py</code>；ADR-012；<code>data/reports/circor-cv-mfcc-annotated/report.json</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">0.801 ± 0.043；复用同折与同阈值规则</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T3" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T3" aria-label="P4-T3 小 CNN（41,105 参数）" checked>
+  <label class="body" for="c-P4-T3">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T3</span>
+      <span class="tname">小 CNN（41,105 参数）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/hs_cnn.py</code>、<code>train_cnn.py</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">0.848 ± 0.051（pooled 0.814）；参数量 41,105</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T4" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T4" aria-label="P4-T4 三臂 × 两窗口六格真实数据复核" checked>
+  <label class="body" for="c-P4-T4">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T4</span>
+      <span class="tname">三臂 × 两窗口六格真实数据复核</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/circor-cv-*/report.json</code>；<code>three-arm-summary.json</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">六格全部患者级 5 折；LR 两格与 ADR-007 逐位一致</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T1、P4-T2、P4-T3</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T5" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T5" aria-label="P4-T5 容量研究（ResNet 463k / TCN 332k）" checked>
+  <label class="body" for="c-P4-T5">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T5</span>
+      <span class="tname">容量研究（ResNet 463k / TCN 332k）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/large_model_experiment.py</code>；<code>data/reports/circor-large-model/report.md</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">同折同窗同超参，只改容量：0.848 / 0.897 / 0.929</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T3</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T6" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T6" aria-label="P4-T6 三种子复现 + 线程数归因" checked>
+  <label class="body" for="c-P4-T6">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T6</span>
+      <span class="tname">三种子复现 + 线程数归因</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/circor-seed-replication/REPORT.md</code>、<code>PRE-REGISTRATION.md</code>；ADR-007 补充</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">15/15 折对为正、区间不含 0；4 线程逐位复现（<code>pooled_delta=0.0</code>）</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T5</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T7" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T7" aria-label="P4-T7 Platt 校准 + 工作点 W1 + bootstrap CI" checked>
+  <label class="body" for="c-P4-T7">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T7</span>
+      <span class="tname">Platt 校准 + 工作点 W1 + bootstrap CI</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/workpoint_analysis.py</code>；<code>data/reports/workpoint-summary.md</code>、<code>workpoint-cnn.json</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">ECE 0.22–0.24 → 0.042；CNN 敏感度 0.777 / 特异度 0.797</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T4</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P4-T8" data-phase="P4" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P4-T8" aria-label="P4-T8 阈值重定并冻结工作点">
+  <label class="body" for="c-P4-T8">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T8</span>
+      <span class="tname">阈值重定并冻结工作点</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/workpoint-summary.md</code>（0.80 门槛差 0.003，2/5 折达标）；<code>meetings/2026-10-20/outline.md</code> 第 5 页</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">新阈值在冻结折上双指标 ≥0.80，或明确接受 0.797 并写进论文</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T7、P4-T6</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T9" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T9" aria-label="P4-T9 S1/S2 事件级评估器 + 确定性 DSP 检测器" checked>
+  <label class="body" for="c-P4-T9">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T9</span>
+      <span class="tname">S1/S2 事件级评估器 + 确定性 DSP 检测器</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/hs_events.py</code>、<code>hs_s1s2.py</code>、<code>evaluate_s1s2.py</code>；ADR-015</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">±100 ms 容差、互换率、患者级聚合；合成数据 macro F1 0.827</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P3-T8</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T10" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T10" aria-label="P4-T10 S1/S2 真实验收与三次改进" checked>
+  <label class="body" for="c-P4-T10">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T10</span>
+      <span class="tname">S1/S2 真实验收与三次改进</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/s1s2-circor*.json</code>、<code>nested-fold*.json</code>、<code>s1s2-hrprior.json</code>；ADR-008/011 补充</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">嵌套 0.7975 ± 0.0210（&lt;0.80）；&gt;120 bpm 互换 0.273；结论如实记为未达标</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T9、P3-T4</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T11" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T11" aria-label="P4-T11 心率精度评估（离线 + 设备条件）" checked>
+  <label class="body" for="c-P4-T11">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T11</span>
+      <span class="tname">心率精度评估（离线 + 设备条件）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/evaluate_heart_rate.py</code>；<code>data/reports/heart-rate-circor.json</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">中位 1.19 / MAE 6.79 / p95 44.2 / 13.5% 粗错；设备条件 MAE 8.14</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T9</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P4-T12" data-phase="P4" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P4-T12" aria-label="P4-T12 ADR-008 回退与 MVP 输出契约" checked>
+  <label class="body" for="c-P4-T12">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P4-T12</span>
+      <span class="tname">ADR-008 回退与 MVP 输出契约</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/mvp-output-contract.md</code>；ADR-008 回退已激活</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">波形与杂音为权威、心率带 <code>~</code>、S1/S2 不展示；措辞与验收条款成文</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T10、P4-T11</span></span>
+  </label>
+</div>
+    </div>
+  </details>
+</section>
+<section class="phase" id="phase-P5" data-phase="P5" data-total="7">
+  <details open>
+    <summary>
+      <span class="pname">P5 泛化与失败分析</span>
+      <span class="pcount"><b class="pticked">6</b> / 7</span>
+      <span class="bar pbar" role="img" aria-label="6/7"><span class="fill" style="width:86%"></span></span>
+    </summary>
+    <div class="rows">
+<div class="task done" data-id="P5-T1" data-phase="P5" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P5-T1" aria-label="P5-T1 campaign 域偏移（CC2014↔CC2015）" checked>
+  <label class="body" for="c-P5-T1">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P5-T1</span>
+      <span class="tname">campaign 域偏移（CC2014↔CC2015）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/circor-campaign-cv/{logreg,small,tcn}/report.json</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">三臂同 2 折：TCN 0.903 vs 小 CNN 0.773</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T5、P3-T7</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P5-T2" data-phase="P5" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P5-T2" aria-label="P5-T2 outcome 第二标签探针（942 人）" checked>
+  <label class="body" for="c-P5-T2">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P5-T2</span>
+      <span class="tname">outcome 第二标签探针（942 人）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/circor-outcome-942/report.md</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">三臂贴杂音天花板 0.650–0.662；TCN 0.672</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T5、P3-T7</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P5-T3" data-phase="P5" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P5-T3" aria-label="P5-T3 增益归因（杂音特异，非通用容量/捷径）" checked>
+  <label class="body" for="c-P5-T3">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P5-T3</span>
+      <span class="tname">增益归因（杂音特异，非通用容量/捷径）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/circor-generalisation/report.md</code>；ADR-007 补充</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">同层 +0.005（不显著）、跨层 +0.065，与两个探针结论一致</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P5-T1、P5-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P5-T4" data-phase="P5" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P5-T4" aria-label="P5-T4 跨中心校准不可迁移的量化" checked>
+  <label class="body" for="c-P5-T4">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P5-T4</span>
+      <span class="tname">跨中心校准不可迁移的量化</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/workpoint-summary.md</code>；ADR-007 补充</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">沿用源中心阈值 BA 0.77 → 0.596，结论"设备必须重校准"</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P5-T1、P4-T7</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P5-T5" data-phase="P5" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P5-T5" aria-label="P5-T5 S1/S2 失败结构分析（高心率反相）" checked>
+  <label class="body" for="c-P5-T5">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P5-T5</span>
+      <span class="tname">S1/S2 失败结构分析（高心率反相）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/s1s2-circor-seq.json</code>；ADR-011 补充</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">139/516 条整段反相、&gt;120 bpm 互换 0.273，失败被解释而非隐藏</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T10</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P5-T6" data-phase="P5" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P5-T6" aria-label="P5-T6 心率粗错结构与两次改进失败" checked>
+  <label class="body" for="c-P5-T6">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P5-T6</span>
+      <span class="tname">心率粗错结构与两次改进失败</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/mvp-output-contract.md</code> §3；<code>data/reports/heart-rate-circor.json</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">426 条粗错中 99 条为"每拍单事件"；两条改进路线均记为失败</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T11</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P5-T7" data-phase="P5" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P5-T7" aria-label="P5-T7 外部队列验证（Heart Valve Regurgitation）">
+  <label class="body" for="c-P5-T7">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P5-T7</span>
+      <span class="tname">外部队列验证（Heart Valve Regurgitation）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/fyp-scope-and-sufficiency.md</code> §2.2（未开始）；<code>docs/handoff-2026-10-19.md</code> §5（主动推迟）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">标签映射方案先评审再下载；产出外部 AUROC 与 CI</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P5-T3</span></span>
+  </label>
+</div>
+    </div>
+  </details>
+</section>
+<section class="phase" id="phase-P6" data-phase="P6" data-total="10">
+  <details open>
+    <summary>
+      <span class="pname">P6 部署格式</span>
+      <span class="pcount"><b class="pticked">7</b> / 10</span>
+      <span class="bar pbar" role="img" aria-label="7/10"><span class="fill" style="width:70%"></span></span>
+    </summary>
+    <div class="rows">
+<div class="task done" data-id="P6-T1" data-phase="P6" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P6-T1" aria-label="P6-T1 首轮 INT8 量化（旧配方）" checked>
+  <label class="body" for="c-P6-T1">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P6-T1</span>
+      <span class="tname">首轮 INT8 量化（旧配方）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/int8-cv/</code>；ADR-007 补充</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">5 折平均掉点 0.0937、最差折 0.2598，判 FAIL 并记录</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T3</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P6-T2" data-phase="P6" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P6-T2" aria-label="P6-T2 量化配方修正 + 5 变体扫描" checked>
+  <label class="body" for="c-P6-T2">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P6-T2</span>
+      <span class="tname">量化配方修正 + 5 变体扫描</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/int8-cv-v2/summary.md</code>、<code>changes.diff.md</code>；<code>data/reports/int8-calibration-sweep/summary.md</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">QInt8 对称 + per-channel + Percentile 99.99 + 200 随机窗；掉点 0.0191</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P6-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P6-T3" data-phase="P6" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P6-T3" aria-label="P6-T3 五折 INT8 复核（最差折 0.0470、69,856 B）" checked>
+  <label class="body" for="c-P6-T3">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P6-T3</span>
+      <span class="tname">五折 INT8 复核（最差折 0.0470、69,856 B）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/int8-cv-v2/summary.json</code>、<code>fold0..4</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">5 折全部重算；1/5 折超 0.03 但 ≤0.05；体积 69,856 B</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P6-T2</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P6-T4" data-phase="P6" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P6-T4" aria-label="P6-T4 TCN INT8 失败（掉 0.1433 / 395,818 B）" checked>
+  <label class="body" for="c-P6-T4">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P6-T4</span>
+      <span class="tname">TCN INT8 失败（掉 0.1433 / 395,818 B）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>data/reports/tcn-int8/fold0.json</code>、<code>tcn-recipe-sweep.json</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">跨配方稳定失败（仅 fold 0，已注明）→ 否决 TCN 的 PTQ 路径</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P6-T2、P4-T5</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P6-T5" data-phase="P6" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P6-T5" aria-label="P6-T5 去归一化导出 + 契约测试" checked>
+  <label class="body" for="c-P6-T5">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P6-T5</span>
+      <span class="tname">去归一化导出 + 契约测试</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>tools/ai/train_cnn.py</code>（<code>include_normalization=False</code>）；<code>tests/python/test_deployment_export.py</code>；ADR-018</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">图内无 Div/Sqrt/Sub；与完整模型 logit 差 4.1e-4（5 项测试固定）</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T3</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P6-T6" data-phase="P6" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P6-T6" aria-label="P6-T6 开发板选型（N16R8 + 320×240 ST7789）" checked>
+  <label class="body" for="c-P6-T6">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P6-T6</span>
+      <span class="tname">开发板选型（N16R8 + 320×240 ST7789）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">ADR-017</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">4 候选对比 + 采购清单 + 失败判据与回退成文</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P6-T3</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P6-T7" data-phase="P6" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P6-T7" aria-label="P6-T7 显示内存方案 + IRAM 口径更正" checked>
+  <label class="body" for="c-P6-T7">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P6-T7</span>
+      <span class="tname">显示内存方案 + IRAM 口径更正</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/iram-and-display-budget.md</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">方案 B 行缓冲 10,240 B；DIRAM 余量 ≥60 KB 的验证方法成文</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P6-T6</span></span>
+  </label>
+</div>
+<div class="task todo crit" data-id="P6-T8" data-phase="P6" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P6-T8" aria-label="P6-T8 ESP-DL / TFLite Micro 转换">
+  <label class="body" for="c-P6-T8">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P6-T8</span>
+      <span class="tname">ESP-DL / TFLite Micro 转换</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>docs/handoff-2026-10-19.md</code> §6 缺陷 1</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">转换成功，且板上输出与 PC ONNX 一致（见 P7-T11）</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P6-T5</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P6-T9" data-phase="P6" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P6-T9" aria-label="P6-T9 板上 INT8 RAM/时延/电流复测">
+  <label class="body" for="c-P6-T9">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P6-T9</span>
+      <span class="tname">板上 INT8 RAM/时延/电流复测</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>docs/implementation-roadmap.md</code> 未勾选</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">峰值堆、P95 单窗、平均电流三项均有板上数字</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P6-T8、P7-T3</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P6-T10" data-phase="P6" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P6-T10" aria-label="P6-T10 TCN 的 QAT（可选，不在关键路径）">
+  <label class="body" for="c-P6-T10">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P6-T10</span>
+      <span class="tname">TCN 的 QAT（可选，不在关键路径）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/handoff-2026-10-19.md</code> §5；ADR-007 补充</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">TCN INT8 掉点 ≤0.03 且体积可接受；否则维持小 CNN</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P6-T4</span></span>
+  </label>
+</div>
+    </div>
+  </details>
+</section>
+<section class="phase" id="phase-P7" data-phase="P7" data-total="14">
+  <details open>
+    <summary>
+      <span class="pname">P7 上板</span>
+      <span class="pcount"><b class="pticked">0</b> / 14</span>
+      <span class="bar pbar" role="img" aria-label="0/14"><span class="fill" style="width:0%"></span></span>
+    </summary>
+    <div class="rows">
+<div class="task todo crit" data-id="P7-T1" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T1" aria-label="P7-T1 采购预审批（PI 邮件 + 311 表格）">
+  <label class="body" for="c-P7-T1">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P7-T1</span>
+      <span class="tname">采购预审批（PI 邮件 + 311 表格）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/reimbursement/README.md</code>（一页流程）；<code>docs/reimbursement/source/311-fyp-purchase-reimbursement-sop-redacted.pdf</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">PI 同意邮件与申请表归档</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P0-T6、P6-T6</span></span>
+  </label>
+</div>
+<div class="task todo crit" data-id="P7-T2" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T2" aria-label="P7-T2 下单 N16R8 + 2.8″ 320×240 SPI 屏">
+  <label class="body" for="c-P7-T2">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P7-T2</span>
+      <span class="tname">下单 N16R8 + 2.8″ 320×240 SPI 屏</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">ADR-017 采购清单</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">订单号、发票抬头与税号、实付金额齐备</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T1</span></span>
+  </label>
+</div>
+<div class="task todo crit" data-id="P7-T3" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T3" aria-label="P7-T3 到货验收与首次烧录启动">
+  <label class="body" for="c-P7-T3">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P7-T3</span>
+      <span class="tname">到货验收与首次烧录启动</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>firmware/README.md</code> §6 第 1 步</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v"><code>idf.py flash</code> 成功；boot banner 与 heap 数字入日志</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T2</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P7-T4" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T4" aria-label="P7-T4 记录 MTU/PHY/连接间隔/CCCD 顺序">
+  <label class="body" for="c-P7-T4">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P7-T4</span>
+      <span class="tname">记录 MTU/PHY/连接间隔/CCCD 顺序</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>docs/link-a-gatt-profile.md</code> §9 第 2/3 项</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">四项逐条有实测值，PHY 回退必须显式记录</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T3、P1-T8</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P7-T5" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T5" aria-label="P7-T5 5 分钟连续流丢帧率">
+  <label class="body" for="c-P7-T5">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P7-T5</span>
+      <span class="tname">5 分钟连续流丢帧率</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；§9 第 4 项</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">吞吐 ≥320 kbps、完整帧丢失 ≤0.1%、无连续 3 帧丢失</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T4、P2-T11</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P7-T6" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T6" aria-label="P7-T6 LKA1 附加延迟 P95 ≤15 ms">
+  <label class="body" for="c-P7-T6">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P7-T6</span>
+      <span class="tname">LKA1 附加延迟 P95 ≤15 ms</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；§9 第 5 项</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">P95 ≤15 ms，最大 ≤30 ms</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T4</span></span>
+  </label>
+</div>
+<div class="task todo crit" data-id="P7-T7" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T7" aria-label="P7-T7 控制通路 START/STOP 往返 &lt;100 ms">
+  <label class="body" for="c-P7-T7">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P7-T7</span>
+      <span class="tname">控制通路 START/STOP 往返 &lt;100 ms</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；§9 第 6 项；<code>ble_central.c</code> 的 <code>START_FROZEN=0</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">连发 100 次无丢，往返 &lt;100 ms</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P1-T9、P7-T4</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P7-T8" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T8" aria-label="P7-T8 绑定 / 解绑 / 重连（session_id 递增）">
+  <label class="body" for="c-P7-T8">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P7-T8</span>
+      <span class="tname">绑定 / 解绑 / 重连（session_id 递增）</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；§9 第 7/8/9 项</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">重启免配对；长按 5 s 解绑；断线后 session_id 递增且旧包不混入</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T4</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P7-T9" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T9" aria-label="P7-T9 Wi-Fi 共存 + 拥塞上报">
+  <label class="body" for="c-P7-T9">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P7-T9</span>
+      <span class="tname">Wi-Fi 共存 + 拥塞上报</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；§9 第 10/11 项</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">并发时第 4 项指标仍达标；拥塞时 <code>Status.error_code=2</code></span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T5</span></span>
+  </label>
+</div>
+<div class="task todo crit" data-id="P7-T10" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T10" aria-label="P7-T10 显示驱动与 UI（波形+分数+心率 ≥10 fps）">
+  <label class="body" for="c-P7-T10">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P7-T10</span>
+      <span class="tname">显示驱动与 UI（波形+分数+心率 ≥10 fps）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/iram-and-display-budget.md</code> §5；ADR-019；<code>firmware/main/display_stub.c</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">整屏 ≥10 fps 无明显撕裂；增量刷新只重画波形区</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T3、P6-T7</span></span>
+  </label>
+</div>
+<div class="task todo crit" data-id="P7-T11" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T11" aria-label="P7-T11 AI 集成（ESP-DL / TFLM）">
+  <label class="body" for="c-P7-T11">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P7-T11</span>
+      <span class="tname">AI 集成（ESP-DL / TFLM）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>firmware/main/ai_stub.c</code>；<code>docs/workflow-and-open-items.md</code> §4 第 4 项</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">板上 logit 与 PC ONNX 差 &lt;1e-2；单窗 &lt;200 ms</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T10、P6-T8</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P7-T12" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T12" aria-label="P7-T12 峰值堆 + 5 分钟堆曲线">
+  <label class="body" for="c-P7-T12">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P7-T12</span>
+      <span class="tname">峰值堆 + 5 分钟堆曲线</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/iram-and-display-budget.md</code> §5 第 4/5 项</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">峰值堆余量 ≥40 KB；5 分钟堆曲线无单调增长</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T11、P7-T5</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P7-T13" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T13" aria-label="P7-T13 信号注入频响（20/100/440/1 kHz）">
+  <label class="body" for="c-P7-T13">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P7-T13</span>
+      <span class="tname">信号注入频响（20/100/440/1 kHz）</span>
+      <span class="badge owner-mate">队友</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/phase0-interface-freeze.md</code> §8；ADR-002 待验证</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">四频点频率与幅值在容差内，抗混叠效果有记录</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T5</span></span>
+  </label>
+</div>
+<div class="task todo crit" data-id="P7-T14" data-phase="P7" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P7-T14" aria-label="P7-T14 上板 11 项联调总验收（G4）">
+  <label class="body" for="c-P7-T14">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P7-T14</span>
+      <span class="tname">上板 11 项联调总验收（G4）</span>
+      <span class="badge owner-joint">共同</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/link-a-gatt-profile.md</code> §9（11 项）；<code>docs/phase0-interface-freeze.md</code> §8</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">11 项逐条有实测记录，不得用"已实现"替代实测</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P7-T4…P7-T13</span></span>
+  </label>
+</div>
+    </div>
+  </details>
+</section>
+<section class="phase" id="phase-P8" data-phase="P8" data-total="7">
+  <details open>
+    <summary>
+      <span class="pname">P8 交付</span>
+      <span class="pcount"><b class="pticked">2</b> / 7</span>
+      <span class="bar pbar" role="img" aria-label="2/7"><span class="fill" style="width:29%"></span></span>
+    </summary>
+    <div class="rows">
+<div class="task doing" data-id="P8-T1" data-phase="P8" data-status="进行中" data-done="0">
+  <input class="tick" type="checkbox" id="c-P8-T1" aria-label="P8-T1 组会/答辩 PPT（11 页，每页一观点）">
+  <label class="body" for="c-P8-T1">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P8-T1</span>
+      <span class="tname">组会/答辩 PPT（11 页，每页一观点）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-doing">进行中</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>meetings/2026-10-20/outline.md</code>（含每页证据表）；<code>meetings/2026-10-20/HANDOFF-to-deck-agent.md</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">11 页齐全、每页 1 观点、每个数字可追溯</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T4、P6-T3</span></span>
+  </label>
+</div>
+<div class="task doing" data-id="P8-T2" data-phase="P8" data-status="进行中" data-done="0">
+  <input class="tick" type="checkbox" id="c-P8-T2" aria-label="P8-T2 决策对比页（重大决策各 ≥1 页）">
+  <label class="body" for="c-P8-T2">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P8-T2</span>
+      <span class="tname">决策对比页（重大决策各 ≥1 页）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-doing">进行中</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/engineering-decision-register.md</code>；<code>meetings/templates/engineering-decision-slides.md</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">候选/量化/风险/判据/回退五要素齐全，覆盖 ADR-001…019</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P8-T1</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P8-T3" data-phase="P8" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P8-T3" aria-label="P8-T3 失败与边界页" checked>
+  <label class="body" for="c-P8-T3">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P8-T3</span>
+      <span class="tname">失败与边界页</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/fyp-scope-and-sufficiency.md</code> §5；<code>meetings/2026-10-20/outline.md</code> 第 10/11 页</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">S1/S2、心率、量化、单数据集四项失败各有数字与出处</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P4-T10、P4-T11、P6-T4</span></span>
+  </label>
+</div>
+<div class="task done" data-id="P8-T4" data-phase="P8" data-status="已完成" data-done="1">
+  <input class="tick" type="checkbox" id="c-P8-T4" aria-label="P8-T4 答辩问答表（问题→证据映射）" checked>
+  <label class="body" for="c-P8-T4">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P8-T4</span>
+      <span class="tname">答辩问答表（问题→证据映射）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-done">已完成</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v"><code>docs/fyp-scope-and-sufficiency.md</code> §4</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">8 个高概率问题各有唯一证据出处</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P8-T3</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P8-T5" data-phase="P8" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P8-T5" aria-label="P8-T5 论文提纲与章节分工">
+  <label class="body" for="c-P8-T5">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P8-T5</span>
+      <span class="tname">论文提纲与章节分工</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认（仓库尚无论文提纲）</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">章节-证据-图表三列大纲，含字数与截止日</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P8-T4</span></span>
+  </label>
+</div>
+<div class="task todo crit" data-id="P8-T6" data-phase="P8" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P8-T6" aria-label="P8-T6 论文正文（方法/结果/工程/失败与边界）">
+  <label class="body" for="c-P8-T6">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="cm" title="关键路径">★</span><span class="tid">P8-T6</span>
+      <span class="tname">论文正文（方法/结果/工程/失败与边界）</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认</span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">四章成稿；每个数字带 FP32/INT8 与线程数标注</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P8-T5、P7-T14、P6-T9</span></span>
+  </label>
+</div>
+<div class="task todo" data-id="P8-T7" data-phase="P8" data-status="未开始" data-done="0">
+  <input class="tick" type="checkbox" id="c-P8-T7" aria-label="P8-T7 图表口径统一 + 复现包 + 演示与归档">
+  <label class="body" for="c-P8-T7">
+    <span class="head">
+      <span class="print-mark" aria-hidden="true"></span>
+      <span class="tid">P8-T7</span>
+      <span class="tname">图表口径统一 + 复现包 + 演示与归档</span>
+      <span class="badge owner-wo">我</span>
+      <span class="badge st-todo">未开始</span>
+    </span>
+    <span class="meta"><span class="k">证据</span><span class="v">待确认；<code>scripts/reproduce.sh</code></span></span>
+    <span class="meta"><span class="k">验收</span><span class="v">口径表（折均值 vs pooled）成文；tag + 依赖 pin 可复现；演示脚本含失败兜底</span></span>
+    <span class="meta"><span class="k">依赖</span><span class="v">P8-T6</span></span>
+  </label>
+</div>
+    </div>
+  </details>
+</section>
+</main>
+
+<footer class="wrap">
+  <p>共 89 项任务 · 数据来源：<code>docs/fyp-overall-workflow.md</code>、<code>docs/handoff-2026-10-19.md</code>、<code>docs/engineering-decision-register.md</code></p>
+  <p>本页无外部依赖，可离线双击打开；进度仅存于本机 localStorage。</p>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var KEY = "fyp-workflow-v1";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll("input.tick"));
+  var total = boxes.length;
+  var stateEl = document.getElementById("save-state");
+  var overallText = document.getElementById("overall-text");
+  var overallFill = document.getElementById("overall-fill");
+  var overallBar = document.getElementById("overall-bar");
+
+  function phaseSections(){ return Array.prototype.slice.call(document.querySelectorAll("section.phase")); }
+
+  function readStore(){
+    try{
+      var raw = window.localStorage.getItem(KEY);
+      if(!raw) return null;
+      var obj = JSON.parse(raw);
+      if(!obj || !Array.isArray(obj.ticked)) return null;
+      return obj;
+    }catch(e){ return null; }
+  }
+  function writeStore(ids){
+    try{
+      window.localStorage.setItem(KEY, JSON.stringify({
+        version: 1,
+        project: "FYP-PCG-stethoscope",
+        updatedAt: new Date().toISOString(),
+        total: total,
+        ticked: ids
+      }));
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function seedFromDom(){
+    boxes.forEach(function(b){ b.checked = b.closest(".task").dataset.done === "1"; });
+  }
+
+  function currentIds(){
+    return boxes.filter(function(b){ return b.checked; })
+                .map(function(b){ return b.closest(".task").dataset.id; });
+  }
+
+  function render(){
+    var ticked = 0;
+    phaseSections().forEach(function(sec){
+      var tb = Array.prototype.slice.call(sec.querySelectorAll("input.tick"));
+      var d = tb.filter(function(b){ return b.checked; }).length;
+      var n = tb.length;
+      sec.querySelector(".pticked").textContent = d;
+      var fill = sec.querySelector(".pbar .fill");
+      if(fill) fill.style.width = (n ? Math.round(100*d/n) : 0) + "%";
+      ticked += d;
+      tb.forEach(function(b){
+        b.closest(".task").classList.toggle("done", b.checked);
+      });
+    });
+    var pct = total ? Math.round(100*ticked/total) : 0;
+    overallText.textContent = "已完成 " + ticked + " / " + total + "（" + pct + "%）";
+    overallFill.style.width = pct + "%";
+    overallBar.setAttribute("aria-label", ticked + "/" + total);
+    return ticked;
+  }
+
+  function save(){
+    var ok = writeStore(currentIds());
+    if(stateEl) stateEl.textContent = ok ? "进度已保存在本机浏览器" : "无法写入 localStorage（隐私模式？）";
+  }
+
+  var stored = readStore();
+  if(stored){
+    var set = new Set(stored.ticked);
+    boxes.forEach(function(b){ b.checked = set.has(b.closest(".task").dataset.id); });
+  } else {
+    seedFromDom();
+    writeStore(currentIds());
+  }
+  render();
+
+  boxes.forEach(function(b){
+    b.addEventListener("change", function(){ render(); save(); });
+  });
+
+  document.getElementById("btn-reset").addEventListener("click", function(){
+    if(!window.confirm("确定重置全部勾选？\n\n只会清除本机浏览器里的进度，不会改动仓库文档。\n重置后会恢复到文档记录的状态（已完成的任务重新打勾）。")) return;
+    try{ window.localStorage.removeItem(KEY); }catch(e){}
+    seedFromDom();
+    writeStore(currentIds());
+    render();
+    if(stateEl) stateEl.textContent = "已重置为文档记录的状态";
+  });
+
+  function summaryJson(){
+    var ids = currentIds();
+    var byPhase = {};
+    phaseSections().forEach(function(sec){
+      var tb = Array.prototype.slice.call(sec.querySelectorAll("input.tick"));
+      var d = tb.filter(function(b){ return b.checked; }).length;
+      byPhase[sec.dataset.phase] = { ticked: d, total: tb.length };
+    });
+    return {
+      project: "FYP-PCG-stethoscope",
+      checklist: "P0-P8 overall workflow",
+      exportedAt: new Date().toISOString(),
+      total: total,
+      ticked: ids.length,
+      percent: total ? Math.round(100*ids.length/total) : 0,
+      byPhase: byPhase,
+      tickedIds: ids
+    };
+  }
+
+  document.getElementById("btn-export").addEventListener("click", function(){
+    var data = JSON.stringify(summaryJson(), null, 2);
+    var name = "fyp-progress-" + new Date().toISOString().slice(0,10) + ".json";
+    var url = URL.createObjectURL(new Blob([data], {type:"application/json"}));
+    var a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    var copied = false;
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        var pr = navigator.clipboard.writeText(data);
+        if(pr && pr.catch) pr.catch(function(){});
+        copied = true;
+      }
+    }catch(e){}
+    if(stateEl) stateEl.textContent = "已导出 " + name + (copied ? "（同时复制到剪贴板）" : "");
+  });
+
+  var forPrint = [];
+  window.addEventListener("beforeprint", function(){
+    forPrint = Array.prototype.slice.call(document.querySelectorAll("details:not([open])"));
+    forPrint.forEach(function(d){ d.open = true; });
+  });
+  window.addEventListener("afterprint", function(){
+    forPrint.forEach(function(d){ d.open = false; });
+    forPrint = [];
+  });
+})();
+</script>
+</body>
+</html>

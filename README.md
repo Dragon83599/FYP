@@ -77,7 +77,9 @@ cd firmware && idf.py set-target esp32s3 && idf.py build
 **状态与交接**
 - `docs/handoff-2026-10-19.md`：当前状态、已确认数字、已知缺陷、下一步（**新对话先读这个**）
 - `docs/implementation-roadmap.md`：软件实施进度
-- `docs/workflow-and-open-items.md`：项目工作流图、与队友的确认清单、我的后续任务
+- `docs/workflow-and-open-items.md`：工作流摘要、与队友的确认清单、我的后续任务
+- `docs/fyp-overall-workflow.md`：**全流程 9 阶段 / 89 任务**（含负责人、证据、验收、关键路径）
+- `meetings/2026-10-20/fyp-workflow.html`：可打钩的交互清单（单文件，勾选进度存本地）
 - `docs/iram-and-display-budget.md`：IRAM/DIRAM 真实预算与显示方案对比
 - `docs/progress-2026-10-18.md`、`docs/progress-2026-10-17.md`、`docs/progress-2026-10-08.md`：逐日进度
 
