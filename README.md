@@ -77,6 +77,7 @@ cd firmware && idf.py set-target esp32s3 && idf.py build
 **状态与交接**
 - `docs/handoff-2026-10-19.md`：当前状态、已确认数字、已知缺陷、下一步（**新对话先读这个**）
 - `docs/implementation-roadmap.md`：软件实施进度
+- `docs/workflow-and-open-items.md`：项目工作流图、与队友的确认清单、我的后续任务
 - `docs/progress-2026-10-18.md`、`docs/progress-2026-10-17.md`、`docs/progress-2026-10-08.md`：逐日进度
 
 **决策记录（ADR-001…018）**
