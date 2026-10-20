@@ -91,6 +91,7 @@ cd firmware && idf.py set-target esp32s3 && idf.py build
 - `docs/phase0-interface-freeze.md`：v0.2 接口基线、测试向量、验收清单
 - `docs/link-a-interface-freeze.md`：`LKA1` 分包与重组
 - `docs/link-a-gatt-profile.md`：BLE GATT 服务、时序、绑定与重连
+- `docs/ble-link-explainer.md`：蓝牙链路入门与方案对比（角色、GATT、MTU、间隔、PHY、DLE、安全、压缩）
 - `docs/connectivity-topology.md`：BLE 探头链路与 Wi-Fi 主机链路拓扑
 - `shared/include/`：`audio_protocol.h`、`link_a_protocol.h`、`host_pipeline.h`
 
