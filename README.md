@@ -93,6 +93,8 @@ cd firmware && idf.py set-target esp32s3 && idf.py build
 - `docs/link-a-gatt-profile.md`：BLE GATT 服务、时序、绑定与重连
 - `docs/ble-link-explainer.md`：蓝牙链路原理与方案对比（需一点基础）
 - `docs/ble-glossary-plain.md`：**零基础版**蓝牙名词表 + 30 秒讲清整条链路
+- `docs/study-plan-2-weeks.md`：两周巩固计划（原理 + 6 篇文献 + 模拟问答）
+- `docs/principle-self-test-30.md`：30 道原理自测题（含标准答案与证据出处）
 - `docs/connectivity-topology.md`：BLE 探头链路与 Wi-Fi 主机链路拓扑
 - `shared/include/`：`audio_protocol.h`、`link_a_protocol.h`、`host_pipeline.h`
 
