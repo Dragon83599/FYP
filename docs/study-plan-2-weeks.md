@@ -41,6 +41,8 @@
 
 ## 4. 文献清单（6 篇，按阅读顺序）
 
+> 第 6 篇（Health Data Science 2024 综述）优先级可以提前：它同时覆盖数据集、技术、临床应用，是写论文相关工作章最快的一篇。
+
 | # | 论文 | 为什么读 | 读的时候找什么 |
 | --- | --- | --- | --- |
 | 1 | Oliveira et al., *The CirCor DigiScope Dataset: From Murmur Detection to Murmur Classification*, IEEE JBHI 2022 | 我们用的数据集 | 标注流程、murmur 与 outcome 的定义、官方 baseline 的指标口径 |
@@ -48,7 +50,7 @@
 | 3 | Schmidt et al., *Segmentation of heart sound recordings by a duration-dependent hidden Markov model*, Physiol. Meas. 2010 | 我们 S1/S2 检测器的同类方法 | 状态机怎么定 S1/S2、为什么高心率容易错 |
 | 4 | Jacob et al., *Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference*, CVPR 2018 | INT8 量化的标准参考 | scale/zero-point、per-channel 与 per-tensor 的差别 |
 | 5 | Krishnamoorthi, *Quantizing deep convolutional networks for efficient inference: A whitepaper*, arXiv 1806.08342 | 为什么 PTQ 不够、QAT 怎么做 | 量化误差来源、QAT 的训练流程 |
-| 6 | *A Comprehensive Survey on Heart Sound Analysis in the Deep Learning Era*, arXiv 2301.09362 | 把我们的工作放进领域地图 | 别人怎么做、我们的差距与特色在哪 |
+| 6 | **Zhao Q, Geng S, Wang B, et al. *Deep Learning in Heart Sound Analysis: From Techniques to Clinical Applications*. Health Data Science. 2024;4:0182. doi:10.34133/hds.0182**（[PMC11461928](https://pmc.ncbi.nlm.nih.gov/articles/PMC11461928/)） | **本领域最新、最贴我们项目的综述**：99 篇原始研究、数据集表、技术流程、临床应用分类 | ① 数据集表（CirCor 在哪、别人用什么）；② 技术流程（预处理→特征→模型）；③ 临床应用 6 类；④ 局限与未来方向；⑤ 可引用的数字（见下）|
 
 > 阅读方式：每篇只读**摘要 + 方法 + 结果表**，30–40 分钟；写 5 行笔记：
 > ① 它解决什么问题 ② 用了什么数据 ③ 关键指标与数字 ④ 和我们的异同 ⑤ 能引用到论文哪一章。
