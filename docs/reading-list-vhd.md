@@ -26,11 +26,17 @@
 | --- | --- | --- | --- |
 | 4 | **Zhao Q, Geng S, Wang B, et al.** *Deep Learning in Heart Sound Analysis: From Techniques to Clinical Applications.* **Health Data Science** 2024;4:0182. doi:10.34133/hds.0182. PMID 39387057 | 领域地图、数据集表、临床应用分类、**医生间 kappa 0.3–0.48** | ✅ 免费：[PMC11461928](https://pmc.ncbi.nlm.nih.gov/articles/PMC11461928/) |
 
+> **更正（2026-10-24）**：Schmidt 2010 **不是六篇知乎文章中的任何一篇引用的**，是我自己加的背景文献。
+> 它真实的来源是三处：① **Yaseen 数据集的 Code.rar** 里带有 `run_Example_Schmidit_script.m` 与
+> `shmidit-Segmentation/` 目录（用于心音分割）；② HDS 综述英文原文提到 **LR-HSMM** 分割（Schmidt 的方法）；
+> ③ 本项目旧方向的 S1/S2 检测器（ADR-011）把它作为对照。
+> 因此它在清单里的定位是"**背景知识**"，不是"某篇博客的出处"。
+
 ## 3. 方法基础（按需读）
 
 | # | 文献 | 用途 | 获取 |
 | --- | --- | --- | --- |
-| 5 | **Schmidt SE, Holst-Hansen C, Graff C, Toft E, Struijk JJ.** *Segmentation of heart sound recordings by a duration-dependent hidden Markov model.* **Physiological Measurement** 2010;31(4). PMID 20208091 | S1/S2 分割的经典方法（第 6 篇的"端点检测"、我们旧项目的 S1/S2 检测器都基于它）| PubMed 摘要免费，全文需订阅 |
+| 5 | **Schmidt SE, Holst-Hansen C, Graff C, Toft E, Struijk JJ.** *Segmentation of heart sound recordings by a duration-dependent hidden Markov model.* **Physiological Measurement** 2010;31(4). PMID 20208091 | S1/S2 分割的经典方法 | PubMed 摘要免费，全文需订阅 |
 | 6 | **待核对**：*Classifying Heart-Sound Signals Based on CNN Trained on MelSpectrum and Log-MelSpectrum Features*（Chen, Zhou 等）| 疑似第 4 篇"对数谱图"的原文 | ⚠️ **未确认**。第 4 篇是 deephub 的中文翻译，原文标题没写；这篇的设定（5 类、CNN/LSTM、0.9967）吻合，但需你在原文里核对 |
 | 7 | **Jacob B, Kligys S, Chen B, et al.** *Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference.* **CVPR 2018** | INT8 量化的标准参考（部署用）| ✅ 免费：CVF Open Access |
 | 8 | **Krishnamoorthi R.** *Quantizing deep convolutional networks for efficient inference: A whitepaper.* arXiv:1806.08342, 2018 | QAT（量化感知训练）| ✅ 免费：arXiv |

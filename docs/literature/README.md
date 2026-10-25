@@ -14,16 +14,24 @@
 
 | # | 文献 | 状态 | 关键结论 | 与我方向的关系 |
 | --- | --- | --- | --- | --- |
-| 01 | Yaseen, Son, Kwon 2018, Applied Sciences 8(12):2344 | 待精读 | 数据集来源；MFCC+DWT 基线 | 数据 |
-| 02 | Alqudah, Alquran 2020, NetMAHIB, doi:10.1007/s13721-020-00272-5 | 待精读 | 双谱特征优于低阶特征 | 特征候选 |
-| 03 | Jain, Choudhary, Singh 2022, ICETCI（已下载全文）| 待精读 | coif5 五级 DWT + 1D-CNN，98.9%，随机 70/30 | 主对标 |
-| 04 | Zhao et al. 2024, Health Data Science 4:0182 | 已读摘要 | 99 篇综述；医生间 kappa 0.3–0.48 | 领域地图 |
-| 05 | Schmidt et al. 2010, Physiol. Meas. 31(4) | 待读 | 时长依赖 HMM 分割 S1/S2 | 预处理/分割 |
+| 01 | Yaseen, Son, Kwon 2018, Applied Sciences 8(12):2344 | 已读 | 自建 1,000 条（5×200，8 kHz）；MFCC 19 + DWT 24，SVM 融合 **97.9%**、DNN 92.1% | 数据 + A1 基线 |
+| 02 | Alqudah, Alquran 2020, NetMAHIB, doi:10.1007/s13721-020-00272-5 | 待找 | 公开副本未获取（Springer closed）| 特征候选 |
+| 03 | Jain, Choudhary, Singh 2022, ICETCI（已下载全文）| 已读 | coif5 五级 DWT→2942 维 + 1D-CNN；98.9% / F1 最低 MVP 98.18%；随机 70/30 | 主对标 |
+| 04 | Zhao et al. 2024, Health Data Science 4:0182 | 已读 | 99 篇（VHD 13 篇）；kappa 0.3–0.48；Yaseen 上各法 92.1–99.32%，外部验证 87.31% | 领域地图 / 相关工作对照表 |
+| 05 | Schmidt et al. 2008, CinC 35:345–349（期刊版 2010 未获取）| 已读（会议版）| DHMM 4 状态分割：99.3% 敏感度 / 99.1% PPV；**排除瓣膜病** | 预处理/分割 |
 | 06 | Jacob et al. 2018, CVPR | 待读 | INT8 整数推理 | 部署 |
 | 07 | Krishnamoorthi 2018, arXiv:1806.08342 | 待读 | QAT | 部署 |
 | 08 | 陈尧 2021, 四川大学 博士论文 | 待找 | 心音心电神经网络方法 | 背景 |
 | 09 | 李婷 2015, 大连理工 博士论文 | 待找 | 循环平稳理论 | 背景 |
 | 10 | 韩威 2020, 广东工业大学 博士论文 | 待找 | 小样本心音分类 | 背景 |
+
+## 已建笔记
+
+- 04 → `docs/literature/04-Zhao-2024-心音深度学习综述.md`（2026-10-24，全篇通读）
+- 01 → `docs/literature/01-Yaseen-2018-数据集与多特征.md`（2026-10-24，全文；PDF 已存 `docs/refs/`）
+- 02 → `docs/literature/02-Alqudah-2020-双谱.md`（2026-10-24，仅引用信息；全文待找）
+- 03 → `docs/literature/03-Jain-2022-DWT-1DCNN.md`（2026-10-24，全文）
+- 05 → `docs/literature/05-Schmidt-2008-DHMM分割.md`（2026-10-24，会议版全文；期刊版未获取）
 
 ## 状态记号
 
