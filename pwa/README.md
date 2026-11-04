@@ -71,7 +71,8 @@ scripts/serve-pwa.sh 9000     # 换端口
 
 | 现象 | 根因 | 修法 |
 | --- | --- | --- |
-| 手机上一直"模型加载中"，诊断里 4 个文件全 OK、tf 也 OK，但 `FAIL ES module 解析：Failed to fetch dynamically imported module` | **Windows 上 `HKEY_CLASSES_ROOT\.js\Content Type` 被改成了 `text/plain`**，Python 的 `http.server` 跟着把 `.js` 当纯文本发出去；浏览器对**经典脚本**宽容，对 **ES module 严格**，于是 `app.js`/`preprocess.js` 全被拒 | 用 `scripts/serve-pwa.py` 起服务（它把 `.js` 钉死为 `text/javascript`），不要用 `python -m http.server` |
+| 手机上一直"模型加载中"，诊断里 4 个文件全 OK、tf 也 OK，但 `FAIL 静态 module 脚本` + `FAIL ES module 解析` | **浏览器不支持 ES module**（华为自带浏览器、夸克等第三方内核常见）。同一台手机上 **Edge / Chrome 正常** | 换 Chrome / Edge / Safari 打开；页面现在会直接这么提示，不再空等 |
+| 同上，但 `静态 module 脚本` 是 `OK`、只有动态 import 失败 | 浏览器把 `.js` 当 `text/plain` 发 → ES module 被拒（Windows 注册表那个坑，见下一行）| 用 `scripts/serve-pwa.py`；诊断里每个文件后面现在会打印实际收到的 Content-Type | | **Windows 上 `HKEY_CLASSES_ROOT\.js\Content Type` 被改成了 `text/plain`**，Python 的 `http.server` 跟着把 `.js` 当纯文本发出去；浏览器对**经典脚本**宽容，对 **ES module 严格**，于是 `app.js`/`preprocess.js` 全被拒 | 用 `scripts/serve-pwa.py` 起服务（它把 `.js` 钉死为 `text/javascript`），不要用 `python -m http.server` |
 
 验证一条命令：
 

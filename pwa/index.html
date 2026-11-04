@@ -65,6 +65,10 @@
     // These two handlers turn that silence into a message with the addresses to
     // check, which is what you want when the only screen available is a phone.
     window.__pwaReady = false;
+    // Browsers without ES module support parse the tag, fetch the file and never
+    // run it, so app.js silently does nothing. Say that plainly instead of
+    // letting the page sit on "模型加载中".
+    window.__pwaNoModules = !("noModule" in HTMLScriptElement.prototype);
     window.addEventListener("error", function (event) {
       if (window.__pwaReady) return;
       var status = document.getElementById("status");
@@ -74,8 +78,17 @@
         "脚本出错，模型未加载：" + (event.message || "未知错误") +
         "（若是语法错误，说明浏览器版本过旧）";
     });
+    if (window.__pwaNoModules) {
+      var early = document.getElementById("status");
+      if (early) {
+        early.style.color = "var(--bad)";
+        early.textContent =
+          "这个浏览器不支持 ES module（模块脚本），页面无法运行。" +
+          "请用 Chrome、Edge 或 Safari 打开同一个地址。";
+      }
+    }
     window.setTimeout(function () {
-      if (window.__pwaReady) return;
+      if (window.__pwaReady || window.__pwaNoModules) return;
       if (typeof window.__pwaDiag === "function") {
         window.__pwaDiag();
         return;

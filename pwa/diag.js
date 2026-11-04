@@ -17,7 +17,7 @@
 (function () {
   "use strict";
 
-  var DIAG_VERSION = "diag-2 (2026-11-04)";
+  var DIAG_VERSION = "diag-4 (2026-11-04)";
 
   function el(id) {
     return document.getElementById(id);
@@ -38,11 +38,34 @@
     ]);
   }
 
+  // Does this browser execute a <script type="module"> at all? Some stock
+  // Android browsers accept the tag, fetch the file, and never run it -- which
+  // is indistinguishable from a network failure without this probe.
+  function probeModuleScript() {
+    return new Promise(function (resolve) {
+      window.__moduleProbe = false;
+      try {
+        var script = document.createElement("script");
+        script.type = "module";
+        script.textContent = "window.__moduleProbe = true;";
+        document.head.appendChild(script);
+      } catch (error) {
+        resolve(false);
+        return;
+      }
+      setTimeout(function () { resolve(window.__moduleProbe === true); }, 1500);
+    });
+  }
+
   function fetchSize(url) {
     return fetch(url, { cache: "no-store" })
       .then(function (response) {
         return response.arrayBuffer().then(function (buffer) {
-          return { status: response.status, bytes: buffer.byteLength };
+          return {
+            status: response.status,
+            bytes: buffer.byteLength,
+            type: response.headers.get("content-type") || "(none)",
+          };
         });
       })
       .catch(function (error) {
@@ -77,14 +100,24 @@
         return chain.then(function () {
           return fetchSize(url).then(function (result) {
             var ok = result.status === 200 && result.bytes > 0;
-            line(out, url, ok, ok ? result.bytes + " 字节" : "HTTP " + result.status + " " + (result.error || ""));
+            line(out, url, ok, ok
+              ? result.bytes + " 字节，" + result.type
+              : "HTTP " + result.status + " " + (result.error || ""));
             return null;
           });
         });
       }, Promise.resolve())
       .then(function () {
+        return probeModuleScript().then(function (supported) {
+          line(out, "静态 module 脚本", supported,
+            supported ? "可以执行" : "不执行（浏览器不支持或已禁用 ES module）");
+          return null;
+        });
+      })
+      .then(function () {
         // Can this browser evaluate an ES module at all?
-        return import("./preprocess.js")
+        var bust = "?diagnose=" + Date.now();
+        return import("./preprocess.js" + bust)
           .then(function () {
             line(out, "ES module 解析", true, "可以（preprocess.js 已执行）");
             return null;
