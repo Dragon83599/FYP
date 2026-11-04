@@ -92,3 +92,49 @@ test("the reference clip is the one the export recorded", () => {
     `the reference wav for ${reference.recording_id} is not next to model.json`,
   );
 });
+
+test("the manifest makes the page installable", () => {
+  const manifest = JSON.parse(read("manifest.json"));
+  assert.ok(manifest.name && manifest.short_name);
+  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.start_url, "./index.html");
+  assert.equal(manifest.scope, "./");
+  assert.ok(Array.isArray(manifest.icons) && manifest.icons.length >= 2);
+  for (const icon of manifest.icons) {
+    assert.ok(existsSync(path.join(PWA, icon.src)), `manifest icon ${icon.src} is missing`);
+  }
+  const html = read("index.html");
+  assert.match(html, /rel="manifest"/, "index.html must link the manifest");
+});
+
+test("the service worker precaches every file the page fetches", () => {
+  // A file the page requests but the worker does not cache is exactly the bug
+  // that shows up as "works at the demo, blank screen when offline".
+  const sw = read("sw.js");
+  const list = sw.match(/const PRECACHE = \[([\s\S]*?)\];/);
+  assert.ok(list, "sw.js must declare PRECACHE");
+  const cached = new Set([...list[1].matchAll(/"\.\/([^"]*)"/g)].map((m) => m[1]));
+
+  const sources = ["index.html", "app.js", "diag.js", "pwa.js", "preprocess.js", "wav.js"]
+    .map((file) => read(file))
+    .join("\n");
+  const requested = new Set(
+    [...sources.matchAll(/(?:fetch\(|src=|href=|import\(|from )"\.\/([^"]+)"/g)].map((m) => m[1]),
+  );
+  for (const file of requested) {
+    assert.ok(cached.has(file), `sw.js does not precache ./${file}, which the page fetches`);
+  }
+  assert.ok(cached.has("model/group1-shard1of1.bin"), "the weights must be cached");
+  assert.ok(cached.has("vendor/tf.min.js"), "the TF.js bundle must be cached");
+});
+
+test("the icons are real PNGs at the advertised sizes", () => {
+  for (const size of [192, 512]) {
+    const file = path.join(PWA, "icons", `icon-${size}.png`);
+    assert.ok(existsSync(file), `${file} is missing`);
+    const header = readFileSync(file).subarray(0, 24);
+    assert.equal(header.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", "not a PNG");
+    assert.equal(header.readUInt32BE(16), size, "width mismatch");
+    assert.equal(header.readUInt32BE(20), size, "height mismatch");
+  }
+});

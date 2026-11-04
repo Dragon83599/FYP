@@ -58,6 +58,11 @@ REQUIRED = {
     "/model/model.json": ("application/json", True),
     "/model/group1-shard1of1.bin": ("application/octet-stream", True),
     "/vendor/tf.min.js": ("text/javascript", True),
+    # PWA plumbing: these types decide whether the browser will install the app.
+    "/manifest.json": ("application/json", True),
+    "/sw.js": ("text/javascript", True),
+    "/pwa.js": ("text/javascript", True),
+    "/icons/icon-192.png": ("image/png", True),
 }
 
 
