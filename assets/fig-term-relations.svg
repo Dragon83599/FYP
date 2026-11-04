@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1980" viewBox="0 0 1600 1980">
+<defs>
+<marker id="arwD" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b434c"/></marker>
+<marker id="arwM" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9aa3ad"/></marker>
+<marker id="arwG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E7D5B"/></marker>
+</defs>
+<rect width="1600" height="1980" fill="#ffffff"/>
+<text x="40" y="62" font-family="Noto Sans SC, sans-serif" font-size="36" font-weight="700" fill="#1f2328">心音相关名词的层级关系与任务映射</text>
+<text x="40" y="98" font-family="Noto Sans SC, sans-serif" font-size="19" font-weight="normal" fill="#5c6672">同一批病人的不同层级标签；不是一套互斥的疾病分类</text>
+<text x="40" y="152" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="700" fill="#2b333c">A · 临床链条</text>
+<rect x="30" y="184" width="1540" height="156" rx="14" fill="#F7F9FB"/>
+<rect x="30" y="368" width="1540" height="424" rx="14" fill="#F7F9FB"/>
+<rect x="30" y="818" width="1540" height="180" rx="14" fill="#F7F9FB"/>
+<rect x="30" y="1018" width="1540" height="150" rx="14" fill="#F7F9FB"/>
+<rect x="30" y="1188" width="1540" height="160" rx="14" fill="#F7F9FB"/>
+<text x="46" y="211" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="600" fill="#7a8593">① 病因 / 机制</text>
+<text x="46" y="395" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="600" fill="#7a8593">② 结构 / 功能病变</text>
+<text x="46" y="845" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="600" fill="#7a8593">③ 结局</text>
+<text x="46" y="1045" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="600" fill="#7a8593">④ 体征（听诊）</text>
+<text x="46" y="1215" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="600" fill="#7a8593">⑤ 信号与目标</text>
+<rect x="220" y="206" width="250" height="112" rx="10" fill="#EFE9F7" stroke="#6A4C93" stroke-width="2"/>
+<text x="345.0" y="265.68" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="600" fill="#1f2328" text-anchor="middle">RHD</text>
+<text x="345.0" y="288.68" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">链球菌感染后瓣膜损害</text>
+<rect x="510" y="206" width="250" height="112" rx="10" fill="#EFE9F7" stroke="#6A4C93" stroke-width="2"/>
+<text x="635.0" y="265.68" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="600" fill="#1f2328" text-anchor="middle">CHD</text>
+<text x="635.0" y="288.68" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">VSD / ASD / PDA / 二叶瓣</text>
+<rect x="800" y="206" width="250" height="112" rx="10" fill="#EFE9F7" stroke="#6A4C93" stroke-width="2"/>
+<text x="925.0" y="265.68" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="600" fill="#1f2328" text-anchor="middle">CAD</text>
+<text x="925.0" y="288.68" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">冠脉粥样硬化</text>
+<rect x="1090" y="206" width="320" height="112" rx="10" fill="#EFE9F7" stroke="#6A4C93" stroke-width="2"/>
+<text x="1250.0" y="265.04" font-family="Noto Sans SC, sans-serif" font-size="22" font-weight="600" fill="#1f2328" text-anchor="middle">高血压 / 左心疾病</text>
+<text x="1250.0" y="288.04" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">非瓣膜病因</text>
+<rect x="400" y="410" width="700" height="360" rx="14" fill="#DCEBF7" stroke="#2F6FA8" stroke-width="2.5"/>
+<text x="418" y="448" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="700" fill="#1F4E75">VHD  瓣膜性心脏病</text>
+<text x="418" y="474" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#44688A">4 个亚型 + 正常 = Yaseen 的 5 类</text>
+<rect x="220" y="470" width="150" height="120" rx="10" fill="#F3F4F6" stroke="#8A94A0" stroke-width="2"/>
+<text x="295.0" y="534.32" font-family="Noto Sans SC, sans-serif" font-size="26" font-weight="600" fill="#1f2328" text-anchor="middle">N</text>
+<text x="295.0" y="557.32" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">Normal</text>
+<rect x="418" y="520" width="150" height="120" rx="8" fill="#FFFFFF" stroke="#2F6FA8" stroke-width="1.8"/>
+<text x="493" y="562" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="700" fill="#1f2328" text-anchor="middle">AS</text>
+<text x="493" y="590" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672" text-anchor="middle">主动脉瓣狭窄</text>
+<text x="493" y="612" font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="normal" fill="#8a94a0" text-anchor="middle">瓣膜病变</text>
+<rect x="585" y="520" width="150" height="120" rx="8" fill="#FFFFFF" stroke="#2F6FA8" stroke-width="1.8"/>
+<text x="660" y="562" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="700" fill="#1f2328" text-anchor="middle">MS</text>
+<text x="660" y="590" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672" text-anchor="middle">二尖瓣狭窄</text>
+<text x="660" y="612" font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="normal" fill="#8a94a0" text-anchor="middle">瓣膜病变</text>
+<rect x="752" y="520" width="150" height="120" rx="8" fill="#FFFFFF" stroke="#2F6FA8" stroke-width="1.8"/>
+<text x="827" y="562" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="700" fill="#1f2328" text-anchor="middle">MR</text>
+<text x="827" y="590" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672" text-anchor="middle">二尖瓣反流</text>
+<text x="827" y="612" font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="normal" fill="#8a94a0" text-anchor="middle">瓣膜病变</text>
+<rect x="919" y="520" width="150" height="120" rx="8" fill="#FFFFFF" stroke="#2F6FA8" stroke-width="1.8"/>
+<text x="994" y="562" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="700" fill="#1f2328" text-anchor="middle">MVP</text>
+<text x="994" y="590" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672" text-anchor="middle">二尖瓣脱垂</text>
+<text x="994" y="612" font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="normal" fill="#8a94a0" text-anchor="middle">结构基础</text>
+<path d="M 994 640 Q 900 710 827 640" fill="none" stroke="#9aa3ad" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arwM)"/>
+<rect x="836" y="700" width="150" height="24" rx="6" fill="#DCEBF7"/>
+<text x="911" y="717" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#44688A" text-anchor="middle">MVP 常合并 MR</text>
+<rect x="1160" y="490" width="270" height="130" rx="10" fill="#E6F0F9" stroke="#2F6FA8" stroke-width="2"/>
+<text x="1295.0" y="559.32" font-family="Noto Sans SC, sans-serif" font-size="26" font-weight="600" fill="#1f2328" text-anchor="middle">PH</text>
+<text x="1295.0" y="582.32" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">第 2 组：左心疾病（VHD / HF）</text>
+<rect x="205" y="398" width="910" height="384" rx="16" fill="none" stroke="#2E7D5B" stroke-width="2.2" stroke-dasharray="9 6"/>
+<text x="214" y="706" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="600" fill="#2E7D5B">Yaseen 五分类</text>
+<text x="214" y="724" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="600" fill="#2E7D5B">标签空间</text>
+<rect x="820" y="850" width="380" height="120" rx="10" fill="#FBEAE8" stroke="#B03A2E" stroke-width="2"/>
+<text x="1010.0" y="903.82" font-family="Noto Sans SC, sans-serif" font-size="26" font-weight="600" fill="#1f2328" text-anchor="middle">HF</text>
+<text x="1010.0" y="926.82" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">任一病因的终末综合征</text>
+<text x="1010.0" y="947.82" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">听诊是 S3/S4、啰音，不是杂音</text>
+<text x="240" y="900" font-family="Noto Sans SC, sans-serif" font-size="17" font-weight="600" fill="#B03A2E">HF 常无特异性杂音</text>
+<text x="240" y="926" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#5c6672">→ 杂音筛查易漏</text>
+<rect x="400" y="1030" width="380" height="110" rx="10" fill="#FDF3E1" stroke="#C77C1E" stroke-width="2"/>
+<text x="590.0" y="1088.68" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="600" fill="#1f2328" text-anchor="middle">杂音 murmur</text>
+<text x="590.0" y="1111.68" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">湍流产生的可闻声音</text>
+<rect x="820" y="1030" width="360" height="110" rx="10" fill="#FDF3E1" stroke="#C77C1E" stroke-width="2"/>
+<text x="1000.0" y="1087.4" font-family="Noto Sans SC, sans-serif" font-size="20" font-weight="600" fill="#1f2328" text-anchor="middle">生理性 / 非心脏来源</text>
+<text x="1000.0" y="1110.4" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">儿童约 50%、贫血、甲亢、发热</text>
+<rect x="400" y="1200" width="380" height="110" rx="10" fill="#E7F4EC" stroke="#2E7D5B" stroke-width="2"/>
+<text x="590.0" y="1258.68" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="600" fill="#1f2328" text-anchor="middle">PCG 心音信号</text>
+<text x="590.0" y="1281.68" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">20–1000 Hz · 8 kHz · 16 bit</text>
+<rect x="820" y="1200" width="360" height="110" rx="10" fill="#F3F4F6" stroke="#8A94A0" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="1000.0" y="1247.54" font-family="Noto Sans SC, sans-serif" font-size="22" font-weight="600" fill="#1f2328" text-anchor="middle">BP / PAP 估计</text>
+<text x="1000.0" y="1270.54" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">回归目标：MAE / R²</text>
+<text x="1000.0" y="1291.54" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672" text-anchor="middle">与疾病分类不同轴</text>
+<line x1="345" y1="318" x2="620" y2="410" stroke="#3b434c" stroke-width="2.0" marker-end="url(#arwD)"/>
+<text x="352" y="366" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672">MS 的主要病因</text>
+<line x1="635" y1="318" x2="700" y2="410" stroke="#3b434c" stroke-width="2.0" marker-end="url(#arwD)"/>
+<text x="690" y="372" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672">二叶瓣 → AS</text>
+<line x1="925" y1="318" x2="860" y2="410" stroke="#9aa3ad" stroke-width="2.0" stroke-dasharray="6 5" marker-end="url(#arwM)"/>
+<text x="944" y="372" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672">缺血性 MR</text>
+<line x1="1250" y1="318" x2="1295" y2="490" stroke="#3b434c" stroke-width="2.0" marker-end="url(#arwD)"/>
+<text x="1302" y="372" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672">左心疾病 → 第 2 组</text>
+<line x1="470" y1="770" x2="470" y2="1030" stroke="#3b434c" stroke-width="2.6" marker-end="url(#arwD)"/>
+<text x="482" y="806" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672">VHD 是杂音的主要来源</text>
+<line x1="950" y1="770" x2="950" y2="850" stroke="#3b434c" stroke-width="2.0" marker-end="url(#arwD)"/>
+<line x1="1100" y1="560" x2="1160" y2="560" stroke="#9aa3ad" stroke-width="2.0" stroke-dasharray="6 5" marker-end="url(#arwM)"/>
+<line x1="820" y1="1085" x2="780" y2="1085" stroke="#9aa3ad" stroke-width="2.0" stroke-dasharray="6 5" marker-end="url(#arwM)"/>
+<line x1="590" y1="1140" x2="590" y2="1200" stroke="#3b434c" stroke-width="2.6" marker-end="url(#arwD)"/>
+<line x1="780" y1="1255" x2="820" y2="1255" stroke="#9aa3ad" stroke-width="2.0" stroke-dasharray="6 5" marker-end="url(#arwM)"/>
+<text x="800" y="1244" font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="normal" fill="#8a94a0" text-anchor="middle">回归</text>
+<text x="40" y="1378" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="normal" fill="#5c6672">注：AS 的杂音是 often 不是 always；约 50% 儿童有生理性杂音；反向（有杂音 ⇒ VHD）不成立。</text>
+<line x1="40" y1="1400" x2="88" y2="1400" stroke="#3b434c" stroke-width="2" marker-end="url(#arwD)"/>
+<text x="98" y="1406" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672">主要 / 常见路径</text>
+<line x1="300" y1="1400" x2="348" y2="1400" stroke="#9aa3ad" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arwM)"/>
+<text x="358" y="1406" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672">次要 / 间接 / 非因果</text>
+<rect x="580" y="1391" width="42" height="18" rx="4" fill="none" stroke="#2E7D5B" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="632" y="1406" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672">Yaseen 五分类覆盖范围</text>
+<text x="40" y="1470" font-family="Noto Sans SC, sans-serif" font-size="24" font-weight="700" fill="#2b333c">B · 任务与负类：为什么不能合成一个分类器</text>
+<rect x="40" y="1492" width="480" height="352" rx="12" fill="#ffffff" stroke="#C77C1E" stroke-width="2"/>
+<rect x="40" y="1492" width="480" height="56" rx="12" fill="#FDF3E1"/>
+<rect x="40" y="1528" width="480" height="20" fill="#FDF3E1"/>
+<text x="60" y="1528" font-family="Noto Sans SC, sans-serif" font-size="23" font-weight="700" fill="#1f2328">① 杂音检测</text>
+<text x="500" y="1528" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672" text-anchor="end">二分类 · 体征</text>
+<text x="60" y="1590" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">正类</text>
+<text x="126" y="1590" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">任何杂音（生理性 + 病理性）</text>
+<text x="60" y="1644" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">负类</text>
+<text x="126" y="1644" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">无杂音：正常、无杂音病理、伪迹</text>
+<text x="60" y="1698" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">数据</text>
+<text x="126" y="1698" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">CirCor / CinC2016</text>
+<text x="126" y="1721" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">CinC2022 / PASCAL</text>
+<text x="60" y="1752" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">指标</text>
+<text x="126" y="1752" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">AUROC、敏感度、特异度</text>
+<text x="60" y="1806" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">用途</text>
+<text x="126" y="1806" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">社区筛查；文献 49 篇</text>
+<rect x="550" y="1492" width="480" height="352" rx="12" fill="#ffffff" stroke="#8A94A0" stroke-width="2"/>
+<rect x="550" y="1492" width="480" height="56" rx="12" fill="#F3F4F6"/>
+<rect x="550" y="1528" width="480" height="20" fill="#F3F4F6"/>
+<text x="570" y="1528" font-family="Noto Sans SC, sans-serif" font-size="23" font-weight="700" fill="#1f2328">② 正常 / 异常分流</text>
+<text x="1010" y="1528" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672" text-anchor="end">二分类 · 派生</text>
+<text x="570" y="1590" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">正类</text>
+<text x="636" y="1590" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">任一 VHD</text>
+<text x="570" y="1644" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">负类</text>
+<text x="636" y="1644" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">仅正常</text>
+<text x="570" y="1698" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">数据</text>
+<text x="636" y="1698" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">Yaseen（同一份划分）</text>
+<text x="570" y="1752" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">指标</text>
+<text x="636" y="1752" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">AUROC；不得称“杂音检测”</text>
+<text x="570" y="1806" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">用途</text>
+<text x="636" y="1806" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">对照；证明数据受限</text>
+<rect x="1060" y="1492" width="480" height="352" rx="12" fill="#ffffff" stroke="#2F6FA8" stroke-width="2"/>
+<rect x="1060" y="1492" width="480" height="56" rx="12" fill="#E6F0F9"/>
+<rect x="1060" y="1528" width="480" height="20" fill="#E6F0F9"/>
+<text x="1080" y="1528" font-family="Noto Sans SC, sans-serif" font-size="23" font-weight="700" fill="#1f2328">③ VHD 亚型分类</text>
+<text x="1520" y="1528" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="normal" fill="#5c6672" text-anchor="end">五分类 · 疾病</text>
+<text x="1080" y="1590" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">正类</text>
+<text x="1146" y="1590" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">AS / MS / MR / MVP</text>
+<text x="1080" y="1644" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">负类</text>
+<text x="1146" y="1644" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">仅正常</text>
+<text x="1080" y="1698" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">数据</text>
+<text x="1146" y="1698" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">Yaseen</text>
+<text x="1080" y="1752" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">指标</text>
+<text x="1146" y="1752" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">macro F1 + 混淆矩阵</text>
+<text x="1080" y="1806" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="600" fill="#7a8593">用途</text>
+<text x="1146" y="1806" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#1f2328">FYP 主线（ADR-020）</text>
+<rect x="40" y="1866" width="1500" height="76" rx="12" fill="#FBEAE8" stroke="#B03A2E" stroke-width="2"/>
+<text x="62" y="1898" font-family="Noto Sans SC, sans-serif" font-size="17" font-weight="600" fill="#8C2D22">⚠ 闭集五分类没有“其他”出口：CHD 的 VSD 会被判成 MR（声学相似），无杂音的 HF 会被判成 N。→ 部署前必须加开放集拒绝。</text>
+<text x="62" y="1926" font-family="Noto Sans SC, sans-serif" font-size="16" font-weight="normal" fill="#8C2D22">⚠ 三个任务的标签集不同：① 的正类含生理性杂音与非 VHD 病理，②③ 的正类只有 VHD、负类只有正常 → 数字不可横比（ADR-021）。</text>
+</svg>
