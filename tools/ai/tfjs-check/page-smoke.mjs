@@ -45,6 +45,9 @@ globalThis.document = {
 };
 
 globalThis.performance = globalThis.performance ?? { now: () => Date.now() };
+// app.js touches a couple of `window` globals (the "did the model load" flag the
+// inline diagnostic in index.html reads); a browser has window === globalThis.
+globalThis.window = globalThis;
 
 globalThis.fetch = async (url) => {
   const relative = String(url).replace(/^https?:\/\/[^/]+\//, "").replace(/^\.\//, "");
