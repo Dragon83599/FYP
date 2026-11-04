@@ -115,3 +115,20 @@ if (rows !== 2) {
   console.error(`expected 2 consistency rows, got ${rows}`);
   process.exitCode = 1;
 }
+
+// Latency check: the page has to be able to produce the W2 acceptance numbers.
+const bench = elements.get("benchmark");
+if (!bench?.listeners?.click) {
+  console.error("the latency button has no handler");
+  process.exitCode = 1;
+} else {
+  bench.disabled = false;
+  await bench.fire("click");
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  const latency = elements.get("latency")?.textContent ?? "";
+  console.log(JSON.stringify({ latency_text: latency }, null, 2));
+  if (!/中位 .* ms/.test(latency)) {
+    console.error("the latency run produced no median");
+    process.exitCode = 1;
+  }
+}
