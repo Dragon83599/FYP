@@ -58,6 +58,32 @@
   </table>
   <pre id="detail" class="muted">等待自检…</pre>
 
+  <script>
+    // If anything goes wrong before app.js takes over, the page would sit on
+    // "模型加载中…" forever and look like a slow download instead of a failure.
+    // These two handlers turn that silence into a message with the addresses to
+    // check, which is what you want when the only screen available is a phone.
+    window.__pwaReady = false;
+    window.addEventListener("error", function (event) {
+      if (window.__pwaReady) return;
+      var status = document.getElementById("status");
+      if (!status) return;
+      status.style.color = "var(--bad)";
+      status.textContent =
+        "脚本出错，模型未加载：" + (event.message || "未知错误") +
+        "（若是语法错误，说明浏览器版本过旧）";
+    });
+    window.setTimeout(function () {
+      if (window.__pwaReady) return;
+      var status = document.getElementById("status");
+      if (!status) return;
+      status.style.color = "var(--bad)";
+      status.textContent =
+        "加载 15 秒仍未完成，通常是文件没下发成功。在手机上分别打开 " +
+        "…/vendor/tf.min.js（应能下载 1.5 MB）和 …/model/model.json（应显示 JSON）；" +
+        "任一打不开，说明服务目录不对或 pwa/ 没拷全。";
+    }, 15000);
+  </script>
   <script src="./vendor/tf.min.js"></script>
   <script type="module" src="./app.js"></script>
 </body>

@@ -282,6 +282,7 @@ async function copyResult() {
 async function main() {
   try {
     const loadMs = await loadModel();
+    window.__pwaReady = true;
     setStatus(
       `模型已加载（${model.countParams().toLocaleString()} 参数，` +
       `后端 ${tf.getBackend()}，${loadMs.toFixed(0)} ms）。选一个 8 kHz wav，或直接跑自检。`,
