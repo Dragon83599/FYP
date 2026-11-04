@@ -26,3 +26,13 @@ firmware/build/
 firmware/sdkconfig
 firmware/managed_components/
 firmware/sdkconfig.old
+
+# Reference papers stay local: publisher PDFs are copyrighted and docs/refs is
+# ~136 MB, which would live in .git forever. Every note in docs/literature/
+# cites its file name, so the path is still the citation; the file itself is a
+# local copy, not something this repository redistributes.
+docs/refs/*.pdf
+docs/refs/*.xml
+
+# Windows download-provenance streams that arrive next to copied files.
+*:Zone.Identifier
