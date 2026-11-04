@@ -48,6 +48,10 @@ globalThis.performance = globalThis.performance ?? { now: () => Date.now() };
 // app.js touches a couple of `window` globals (the "did the model load" flag the
 // inline diagnostic in index.html reads); a browser has window === globalThis.
 globalThis.window = globalThis;
+// diag.js reports the page address; Node has no location object.
+globalThis.location = globalThis.location ?? {
+  href: "http://localhost:8080/index.html",
+};
 
 globalThis.fetch = async (url) => {
   const relative = String(url).replace(/^https?:\/\/[^/]+\//, "").replace(/^\.\//, "");
@@ -117,6 +121,20 @@ if (!/一致性自检通过/.test(finalStatus)) {
 if (rows !== 2) {
   console.error(`expected 2 consistency rows, got ${rows}`);
   process.exitCode = 1;
+}
+
+// Diagnostic: it must run even when app.js is broken, so exercise it directly.
+await import(pathToFileURL(path.join(PWA, "diag.js")).href);
+if (typeof globalThis.__pwaDiag !== "function") {
+  console.error("diag.js did not define __pwaDiag");
+  process.exitCode = 1;
+} else {
+  const report = await globalThis.__pwaDiag();
+  console.log(JSON.stringify({ diag: report.split("\n").slice(0, 8) }, null, 2));
+  if (!/OK \.\/model\/model\.json/.test(report)) {
+    console.error("diagnostic did not confirm model.json is reachable");
+    process.exitCode = 1;
+  }
 }
 
 // Latency check: the page has to be able to produce the W2 acceptance numbers.
