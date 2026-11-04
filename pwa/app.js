@@ -50,13 +50,61 @@ function setStatus(text, isError = false) {
   els.status.style.color = isError ? "var(--bad)" : "";
 }
 
+/** Reject after `ms` so a hung backend cannot freeze the page forever. */
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} 超过 ${ms / 1000} 秒没有响应`)), ms)),
+  ]);
+}
+
+/**
+ * Pick a backend, preferring WebGL but never depending on it.
+ *
+ * A machine with a broken or software-only WebGL context can leave
+ * `setBackend("webgl")` pending forever, which used to look identical to a slow
+ * download. Each backend gets a deadline; CPU is always the fallback, and the
+ * chosen one is printed so the numbers are interpretable.
+ */
+async function initBackend() {
+  for (const name of ["webgl", "cpu"]) {
+    setStatus(`正在初始化 TensorFlow.js 后端：${name}…`);
+    try {
+      await withTimeout(tf.setBackend(name), 5000, `${name} 后端初始化`);
+      await withTimeout(tf.ready(), 5000, `${name} 后端就绪`);
+      if (tf.getBackend() === name) return name;
+    } catch (error) {
+      console.warn(`backend ${name} unavailable:`, error);
+    }
+  }
+  throw new Error("webgl 与 cpu 两个后端都无法初始化");
+}
+
 async function loadModel() {
   const started = performance.now();
-  model = await tf.loadLayersModel("./model/model.json");
+  const backend = await initBackend();
+  setStatus(`后端 ${backend}，正在下载模型（87 KB）…`);
+  model = await withTimeout(
+    tf.loadLayersModel("./model/model.json"),
+    30000,
+    "模型下载/解析",
+  );
   // Warm up once so the first user-visible inference is not the graph build.
-  const warm = tf.zeros([1, 2000, 1]);
-  model.predict(warm).dispose();
-  warm.dispose();
+  // Shader compilation happens here, which is also where a broken WebGL shows up.
+  setStatus(`后端 ${backend}，正在预热推理…`);
+  try {
+    const warm = tf.zeros([1, 2000, 1]);
+    model.predict(warm).dispose();
+    warm.dispose();
+  } catch (error) {
+    console.warn("warm-up failed, falling back to cpu:", error);
+    await tf.setBackend("cpu");
+    await tf.ready();
+    const warm = tf.zeros([1, 2000, 1]);
+    model.predict(warm).dispose();
+    warm.dispose();
+  }
   const ms = performance.now() - started;
   const params = model.countParams();
   els.paramCount.textContent = params.toLocaleString();
