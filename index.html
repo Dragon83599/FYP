@@ -38,8 +38,11 @@
   <div class="row">
     <input id="file" type="file" accept=".wav,audio/wav" />
     <button id="self-check" type="button">跑一致性自检</button>
+    <button id="benchmark" type="button">测 20 次时延</button>
+    <button id="copy" type="button">复制结果</button>
   </div>
   <p class="muted" id="status">模型加载中…</p>
+  <p class="muted" id="latency"></p>
 
   <h2>2 · 五类概率</h2>
   <table>

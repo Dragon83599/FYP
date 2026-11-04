@@ -26,6 +26,9 @@ const LABEL_ZH = {
 const els = {
   file: document.getElementById("file"),
   selfCheck: document.getElementById("self-check"),
+  benchmark: document.getElementById("benchmark"),
+  copy: document.getElementById("copy"),
+  latency: document.getElementById("latency"),
   status: document.getElementById("status"),
   probs: document.getElementById("probs"),
   verdict: document.getElementById("verdict"),
@@ -35,6 +38,12 @@ const els = {
 };
 
 let model = null;
+// The last tensor that went through the model, kept so the latency check can
+// time the same input the self-check measured.
+let lastInput = null;
+// Everything the page knows after a self-check, so "复制结果" can hand the
+// numbers to whoever asked for the browser evidence.
+let lastResult = null;
 
 function setStatus(text, isError = false) {
   els.status.textContent = text;
@@ -108,6 +117,7 @@ async function classifyArrayBuffer(buffer, label) {
   const startedPre = performance.now();
   const { input, stats } = preprocess(wav.samples);
   const preMs = performance.now() - startedPre;
+  lastInput = input;
   const started = performance.now();
   const probabilities = predict(input);
   const inferMs = performance.now() - started;
@@ -176,6 +186,26 @@ async function runSelfCheck() {
       2,
     );
 
+    lastResult = {
+      checked_at: new Date().toISOString(),
+      reference: reference.recording_id,
+      class_order: CLASS_ORDER,
+      keras_probabilities: Object.fromEntries(
+        CLASS_ORDER.map((c, i) => [c, reference.keras_probabilities[i]]),
+      ),
+      browser_probabilities: Object.fromEntries(
+        CLASS_ORDER.map((c, i) => [c, probabilities[i]]),
+      ),
+      tensor_max_abs_diff: tensorDiff,
+      end_to_end_max_abs_diff: e2eDiff,
+      preprocessed_sample_max_abs_diff: inputDiff,
+      tolerance: TOLERANCE,
+      backend: tf.getBackend(),
+      tfjs: tf.version.tfjs,
+      user_agent: navigator.userAgent,
+      passed: rows.every((row) => row.passed),
+    };
+
     const allPassed = rows.every((row) => row.passed);
     setStatus(
       allPassed
@@ -188,6 +218,64 @@ async function runSelfCheck() {
     els.detail.textContent = String(error.stack ?? error);
   } finally {
     els.selfCheck.disabled = false;
+  }
+}
+
+/**
+ * Time N warm inferences and report the median and P95.
+ *
+ * The W2 end-side acceptance is median <= 1 s and P95 <= 2 s, so the page has to
+ * be able to produce those two numbers itself rather than a single timing from
+ * whichever run happened to be visible.
+ */
+async function runBenchmark() {
+  els.benchmark.disabled = true;
+  try {
+    let input = lastInput;
+    if (!input) {
+      const reference = await (await fetch("./model/reference.json")).json();
+      input = Float32Array.from(reference.input);
+    }
+    predict(input);   // discard one warm-up run
+    const runs = 20;
+    const times = [];
+    for (let i = 0; i < runs; i += 1) {
+      const started = performance.now();
+      predict(input);
+      times.push(performance.now() - started);
+    }
+    const sorted = [...times].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const p95 = sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)];
+    const verdict = median <= 1000 && p95 <= 2000
+      ? `达标（中位 ≤1 s、P95 ≤2 s）`
+      : `未达标（判据：中位 ≤1 s、P95 ≤2 s）`;
+    els.latency.textContent =
+      `时延 ${runs} 次：中位 ${median.toFixed(1)} ms，P95 ${p95.toFixed(1)} ms，` +
+      `最小 ${sorted[0].toFixed(1)} / 最大 ${sorted.at(-1).toFixed(1)} ms — ${verdict}`;
+    const record = { backend: tf.getBackend(), runs, median_ms: Number(median.toFixed(3)),
+                     p95_ms: Number(p95.toFixed(3)), min_ms: Number(sorted[0].toFixed(3)),
+                     max_ms: Number(sorted.at(-1).toFixed(3)), verdict };
+    lastResult = { ...(lastResult ?? {}), latency: record };
+    return record;
+  } finally {
+    els.benchmark.disabled = false;
+  }
+}
+
+async function copyResult() {
+  if (!lastResult) {
+    setStatus("先跑一次一致性自检（或时延测试），再复制结果", true);
+    return;
+  }
+  const text = JSON.stringify(lastResult, null, 2);
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus("结果已复制到剪贴板，可直接粘贴给导师/队友");
+  } catch {
+    // Clipboard needs a secure context in some browsers; show it instead.
+    els.detail.textContent = text;
+    setStatus("本环境不允许写剪贴板，结果已显示在下方，请手动复制");
   }
 }
 
@@ -204,6 +292,8 @@ async function main() {
   }
   els.file.addEventListener("change", onFile);
   els.selfCheck.addEventListener("click", runSelfCheck);
+  els.benchmark.addEventListener("click", runBenchmark);
+  els.copy.addEventListener("click", copyResult);
 }
 
 main();
