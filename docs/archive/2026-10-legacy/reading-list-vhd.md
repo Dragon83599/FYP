@@ -11,7 +11,7 @@
 | --- | --- | --- | --- |
 | 1 | **Yaseen, Son G-Y, Kwon S.** *Classification of Heart Sound Signal Using Multiple Features.* **Applied Sciences** 2018;8(12):2344. doi:10.3390/app8122344 | 数据集来源（第 1、2、4、6 篇都用它）| **开放获取**（MDPI），含 MFCC+DWT 基线 |
 | 2 | **Alqudah AM, Alquran H, et al.** *Classification of heart sound short records using bispectrum analysis approach images and deep learning.* **Network Modeling Analysis in Health Informatics and Bioinformatics** 2020;9. doi:10.1007/s13721-020-00272-5 | 第 1、2 篇的**双谱**依据 | Springer，需机构权限；摘要可查 |
-| 3 | **Jain PK（NIT Rourkela）, Choudhary RR, Singh MR（Central Univ. of Rajasthan）.** *A Lightweight 1-D Convolution Neural Network Model for Multi-class Classification of Heart Sounds.* **ICETCI 2022**（Mahindra University, Hyderabad, Aug 25–27）| 第 6 篇的原文 | ✅ **已下载并核对**：`docs/refs/2022-jain-icetci-dwt-1dcnn.pdf`（5 页，405 KB）；原文 <http://hdl.handle.net/2080/3735> |
+| 3 | **Jain PK（NIT Rourkela）, Choudhary RR, Singh MR（Central Univ. of Rajasthan）.** *A Lightweight 1-D Convolution Neural Network Model for Multi-class Classification of Heart Sounds.* **ICETCI 2022**（Mahindra University, Hyderabad, Aug 25–27）| 第 6 篇的原文 | ✅ **已下载并核对**：`docs/refs/03-jain-2022-icetci.pdf`（5 页，405 KB）；原文 <http://hdl.handle.net/2080/3735> |
 
 > 第 3 篇直接给了 98.9%、敏感度 99.01%、特异度 99.72%，方法步骤写得最全。
 > **已逐条核对知乎译文与原文一致**：8 kHz → 1 kHz、端点检测后定长 **2800 点**、
