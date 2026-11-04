@@ -71,6 +71,7 @@ scripts/serve-pwa.sh 9000     # 换端口
 | 时延测量按钮（Node CPU 后端） | ✅ 中位 **12.0 ms**、P95 **13.7 ms**（20 次，预热 1 次） | `node tools/ai/tfjs-check/page-smoke.mjs` |
 | **真实浏览器 + WebGL 后端** | ✅ 安卓 Edge 实测：后端 **webgl**，端到端 **1.88e-12**，样本级 **0** | 2026-11-04 |
 | **手机端时延**（中位 ≤1 s / P95 ≤2 s） | ✅ 安卓 Edge/WebGL：中位 **4.4 ms**、P95 **5.1 ms**（20 次） | 2026-11-04 |
+| **安装为 PWA 并离线运行** | ✅ 已部署到 **https://dragon83599.github.io/FYP/**，装到桌面后关电脑 + 飞行模式仍可自检 | 2026-11-04 |
 
 **注意**：`PASS` 的前提是页面用 `model/model.json` 这份权重；换模型后必须重跑上面三条命令。
 

@@ -271,6 +271,22 @@ attempt 间 95% CI（t 分布，n = 4）：**[98.01%, 98.79%]**，半宽 **0.39 
 | 安卓 Edge（手机） | WebGL | **4.4 ms** | 真机，本文 |
 | 本机（8 核 CPU） | CPU（Node） | 12 ms | 无 GPU 加速时的参考 |
 
+### 9.4b 真 PWA：部署到 HTTPS，装到手机后离线可跑（2026-11-04）
+
+之前那个 `http://` 页面**只是把算力放在手机上，文件仍每次从电脑取**——关掉电脑就打不开，
+严格说不是 PWA。补齐 `manifest.json` + `sw.js`（预缓存 16 个文件）+ `icons/` 之后，部署到 HTTPS：
+
+| 项 | 值 |
+| --- | --- |
+| 线上地址 | **https://dragon83599.github.io/FYP/** |
+| 托管 | GitHub Pages，分支 `pwa-export`（`git subtree split --prefix=pwa`，20 个文件 / 1.8 MB）|
+| 线上与本地逐文件 sha256 | `model.json`、`group1-shard1of1.bin`、`sw.js`、`app.js` **全部一致** |
+| Content-Type | `app.js`/`sw.js` **application/javascript**、`model.json` application/json、权重 octet-stream（模块与 SW 都满足）|
+| 手机端 | **已安装到桌面，关掉电脑 + 飞行模式下自检仍通过** |
+
+**这一步的意义**：从此"端侧"不再依赖那台电脑。答辩现场可直接演示——把电脑合上、手机开飞行模式，
+从桌面图标打开，仍有五类概率与 **1.88e-12** 的一致性结果。
+
 时延（Node CPU 后端，单次）：模型加载 **12.9 ms**，首次推理 **39–77 ms**（含图构建）。
 浏览器的 WebGL 后端与真机时延**尚未实测**，属于 W2 端上验收（中位 ≤1 s / P95 ≤2 s）的下一步。
 
