@@ -14,6 +14,8 @@ build/
 build-*/
 data/
 .venv/
+.venv-*/
+node_modules/
 *.pt
 *.onnx
 *.tflite

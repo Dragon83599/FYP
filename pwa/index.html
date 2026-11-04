@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>心音五分类 · 端侧演示（PWA）</title>
+  <style>
+    :root { color-scheme: light dark; --fg: #111; --bg: #fafafa; --muted: #666; --ok: #0a7d32; --bad: #b3261e; }
+    @media (prefers-color-scheme: dark) {
+      :root { --fg: #eee; --bg: #141414; --muted: #aaa; --ok: #6cd58b; --bad: #ff8a80; }
+    }
+    body { margin: 0 auto; max-width: 46rem; padding: 1.25rem; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); }
+    h1 { font-size: 1.3rem; margin: 0 0 .3rem; }
+    h2 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+    .muted { color: var(--muted); font-size: .85rem; }
+    .row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+    button { font: inherit; padding: .4rem .8rem; border-radius: .4rem; border: 1px solid var(--muted); background: transparent; color: inherit; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+    th, td { text-align: left; padding: .25rem .4rem; border-bottom: 1px solid #8884; }
+    td.num { text-align: right; }
+    .bar { height: .55rem; border-radius: .3rem; background: #8884; overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: currentColor; }
+    .verdict { font-weight: 600; }
+    .ok { color: var(--ok); }
+    .bad { color: var(--bad); }
+    pre { background: #8881; padding: .6rem; border-radius: .4rem; overflow-x: auto; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <h1>心音五分类 · 端侧演示</h1>
+  <p class="muted">
+    Ma 等（2023）轻量 CNN 的浏览器实现：1 kHz · 2 s · 2,000 点 · <span id="param-count">20,193</span> 参数。
+    全部推理在本机完成，不联网。
+  </p>
+
+  <h2>1 · 选一个 8 kHz 单声道 wav</h2>
+  <div class="row">
+    <input id="file" type="file" accept=".wav,audio/wav" />
+    <button id="self-check" type="button">跑一致性自检</button>
+  </div>
+  <p class="muted" id="status">模型加载中…</p>
+
+  <h2>2 · 五类概率</h2>
+  <table>
+    <thead><tr><th>类别</th><th class="num">概率</th><th style="width:55%"></th></tr></thead>
+    <tbody id="probs"></tbody>
+  </table>
+  <p id="verdict" class="verdict"></p>
+
+  <h2>3 · 与 Python（Keras）的一致性</h2>
+  <table>
+    <thead><tr><th>检查</th><th class="num">最大绝对差</th><th class="num">判据</th><th>结果</th></tr></thead>
+    <tbody id="consistency"></tbody>
+  </table>
+  <pre id="detail" class="muted">等待自检…</pre>
+
+  <script src="./vendor/tf.min.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

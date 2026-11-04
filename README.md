@@ -81,7 +81,7 @@ cd firmware && idf.py set-target esp32s3 && idf.py build
 - `docs/fyp-overall-workflow.md`：**全流程 9 阶段 / 89 任务**（含负责人、证据、验收、关键路径）
 - `meetings/2026-10-20/fyp-workflow.html`：可打钩的交互清单（单文件，勾选进度存本地）
 - `docs/iram-and-display-budget.md`：IRAM/DIRAM 真实预算与显示方案对比
-- `docs/progress-2026-10-18.md`、`docs/progress-2026-10-17.md`、`docs/progress-2026-10-08.md`：逐日进度
+- `docs/progress-2026-10-18.md`、`docs/progress-2026-10-17.md`、`docs/archive/2026-10-legacy/progress-2026-10-08.md`：逐日进度
 
 **决策记录（ADR-001…018）**
 - `docs/engineering-decision-register.md`：全部决策、证据等级、验证与回退
@@ -92,10 +92,10 @@ cd firmware && idf.py set-target esp32s3 && idf.py build
 - `docs/link-a-interface-freeze.md`：`LKA1` 分包与重组
 - `docs/link-a-gatt-profile.md`：BLE GATT 服务、时序、绑定与重连
 - `docs/ble-link-explainer.md`：蓝牙链路原理与方案对比（需一点基础）
-- `docs/ble-glossary-plain.md`：**零基础版**蓝牙名词表 + 30 秒讲清整条链路
+- `docs/archive/2026-10-legacy/ble-glossary-plain.md`：**零基础版**蓝牙名词表 + 30 秒讲清整条链路
 - `docs/plan-5class-vhd.md`：**新方向实施计划**（五分类瓣膜病：预处理/特征/模型/评估/部署）
-- `docs/reference-review-6-articles.md`：**六篇参考文章拆解 + 问题清单 + 三臂方案**
-- `docs/study-plan-2-weeks.md`：两周巩固计划（原理 + 6 篇文献 + 模拟问答）
+- `docs/archive/2026-10-legacy/reference-review-6-articles.md`：**六篇参考文章拆解 + 问题清单 + 三臂方案**
+- `docs/archive/2026-10-legacy/study-plan-2-weeks.md`：两周巩固计划（原理 + 6 篇文献 + 模拟问答）
 - `docs/principle-self-test-30.md`：30 道原理自测题（含标准答案与证据出处）
 - `docs/connectivity-topology.md`：BLE 探头链路与 Wi-Fi 主机链路拓扑
 - `shared/include/`：`audio_protocol.h`、`link_a_protocol.h`、`host_pipeline.h`
@@ -103,7 +103,7 @@ cd firmware && idf.py set-target esp32s3 && idf.py build
 **AI 与评估**
 - `docs/mvp-output-contract.md`：MVP 输出契约（波形/杂音/心率/S1-S2 的措辞要求）
 - `docs/fyp-scope-and-sufficiency.md`：范围契约（必须/应该/不做）与答辩检查表
-- `docs/edge-ai-primer.md`：边缘 AI 基础速查（参数量/MACs/INT8/内存层次）
+- `docs/archive/2026-10-legacy/edge-ai-primer.md`：边缘 AI 基础速查（参数量/MACs/INT8/内存层次）
 - `docs/host-resource-budget.md`：主机平台资源预算
 - `docs/ai-baseline-plan.md`、`docs/ai-model-resource-budget-guide.md`：基线与预算指南
 - `docs/s1s2-detector-baseline.md`：S1/S2 检测器的方法、实测与失败模式

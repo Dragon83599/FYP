@@ -1,0 +1,9 @@
+{
+  "name": "tfjs-check",
+  "private": true,
+  "type": "module",
+  "description": "Loads the exported layers-model with the real @tensorflow/tfjs and compares it against Keras.",
+  "dependencies": {
+    "@tensorflow/tfjs": "4.22.0"
+  }
+}

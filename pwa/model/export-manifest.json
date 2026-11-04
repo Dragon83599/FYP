@@ -1,0 +1,109 @@
+{
+  "source_model": "data/reports/repro-ma2023/model.keras",
+  "source_model_sha256": "fa68009e8e1b410e40b2e3b503c61ed9304f48fb023752340ce5f2ffb7760fef",
+  "tensorflow": "2.20.0",
+  "keras": "3.15.1",
+  "format": "layers-model (k1)",
+  "class_order": [
+    "AS",
+    "MS",
+    "MR",
+    "MVP",
+    "N"
+  ],
+  "parameters": 20193,
+  "shard_bytes": 80772,
+  "model_json_bytes": 6603,
+  "weights": [
+    {
+      "name": "conv1/kernel",
+      "shape": [
+        20,
+        1,
+        16
+      ]
+    },
+    {
+      "name": "conv1/bias",
+      "shape": [
+        16
+      ]
+    },
+    {
+      "name": "conv2/kernel",
+      "shape": [
+        20,
+        16,
+        8
+      ]
+    },
+    {
+      "name": "conv2/bias",
+      "shape": [
+        8
+      ]
+    },
+    {
+      "name": "conv3/kernel",
+      "shape": [
+        20,
+        8,
+        4
+      ]
+    },
+    {
+      "name": "conv3/bias",
+      "shape": [
+        4
+      ]
+    },
+    {
+      "name": "fc/kernel",
+      "shape": [
+        124,
+        128
+      ]
+    },
+    {
+      "name": "fc/bias",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "name": "out/kernel",
+      "shape": [
+        128,
+        5
+      ]
+    },
+    {
+      "name": "out/bias",
+      "shape": [
+        5
+      ]
+    }
+  ],
+  "files": {
+    "model.json": {
+      "sha256": "1c0b7e03af16daf03799814e5c11b270fc05e3675f82d4bd98f073abc8ba826e",
+      "bytes": 6603
+    },
+    "group1-shard1of1.bin": {
+      "sha256": "f15cb1b9c1490a34c5ccf1b58ddf5eb8d16301615a5f031b3569b7c366ab3460",
+      "bytes": 80772
+    }
+  },
+  "reference": {
+    "clip_index": 0,
+    "recording_id": "New_AS_001",
+    "keras_prediction": "AS",
+    "keras_probabilities": [
+      0.9999990463256836,
+      2.1182162868171872e-07,
+      5.737331889577035e-07,
+      8.524067141024716e-08,
+      4.914797457900022e-10
+    ]
+  }
+}
