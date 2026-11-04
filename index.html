@@ -57,6 +57,7 @@
     <tbody id="consistency"></tbody>
   </table>
   <pre id="detail" class="muted">等待自检…</pre>
+  <pre id="diag" style="display:none"></pre>
 
   <script>
     // If anything goes wrong before app.js takes over, the page would sit on
@@ -75,16 +76,18 @@
     });
     window.setTimeout(function () {
       if (window.__pwaReady) return;
+      if (typeof window.__pwaDiag === "function") {
+        window.__pwaDiag();
+        return;
+      }
       var status = document.getElementById("status");
       if (!status) return;
       status.style.color = "var(--bad)";
-      status.textContent =
-        "加载 15 秒仍未完成，通常是文件没下发成功。在手机上分别打开 " +
-        "…/vendor/tf.min.js（应能下载 1.5 MB）和 …/model/model.json（应显示 JSON）；" +
-        "任一打不开，说明服务目录不对或 pwa/ 没拷全。";
+      status.textContent = "加载 15 秒仍未完成，且诊断脚本未加载（diag.js 缺失）。";
     }, 15000);
   </script>
   <script src="./vendor/tf.min.js"></script>
+  <script src="./diag.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>
