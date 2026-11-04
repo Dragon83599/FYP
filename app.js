@@ -34,10 +34,16 @@ const els = {
   verdict: document.getElementById("verdict"),
   consistency: document.getElementById("consistency"),
   detail: document.getElementById("detail"),
+  samples: document.getElementById("samples"),
+  samplesNote: document.getElementById("samples-note"),
+  samplesResult: document.getElementById("samples-result"),
   paramCount: document.getElementById("param-count"),
 };
 
 let model = null;
+// Tally for the one-tap sample buttons: how many of the labelled clips the model
+// got right in this session.
+const tally = { total: 0, correct: 0 };
 // The last tensor that went through the model, kept so the latency check can
 // time the same input the self-check measured.
 let lastInput = null;
@@ -187,6 +193,61 @@ async function onFile(event) {
     await classifyArrayBuffer(buffer, file.name);
   } catch (error) {
     setStatus(String(error.message ?? error), true);
+  }
+}
+
+/**
+ * Render one button per labelled clip and classify it on tap.
+ *
+ * This exists so the model can be tried on the phone without first getting a
+ * wav file onto the device. The clips are the first two recordings of each
+ * class by file name -- chosen without looking at predictions, so a wrong
+ * answer would be shown as wrong.
+ */
+async function loadSamples() {
+  try {
+    const response = await fetch("./samples/index.json", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const index = await response.json();
+    els.samples.innerHTML = "";
+    for (const item of index.items) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = `${item.label} · ${item.recording_id}`;
+      button.addEventListener("click", () => classifySample(item));
+      els.samples.appendChild(button);
+    }
+    els.samplesNote.textContent =
+      `共 ${index.items.length} 条样音（每类取文件名前两条，未按预测挑选）。点一下就能判读。`;
+  } catch (error) {
+    els.samplesNote.textContent = `样音列表加载失败：${error.message ?? error}`;
+  }
+}
+
+async function classifySample(item) {
+  try {
+    const response = await fetch(`./samples/${item.file}`, { cache: "force-cache" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const wav = parseWav(await response.arrayBuffer());
+    if (wav.sampleRate !== 8000) {
+      throw new Error(`样音是 ${wav.sampleRate} Hz，应为 8 kHz`);
+    }
+    const { input } = preprocess(wav.samples);
+    const probabilities = predict(input);
+    renderProbabilities(probabilities);
+    const predicted = CLASS_ORDER[argmax(probabilities)];
+    const ok = predicted === item.label;
+    tally.total += 1;
+    if (ok) tally.correct += 1;
+    els.samplesResult.textContent =
+      `${item.recording_id}：真实 ${item.label}，判读 ${predicted} ` +
+      `(${(probabilities[argmax(probabilities)] * 100).toFixed(2)}%) ${ok ? "✔" : "✘"}　` +
+      `累计 ${tally.correct}/${tally.total}`;
+    els.samplesResult.style.color = ok ? "var(--ok)" : "var(--bad)";
+    setStatus(`样音 ${item.recording_id} 已判读（${wav.samples.length.toLocaleString()} 点 @8 kHz）`);
+  } catch (error) {
+    els.samplesResult.textContent = `样音判读失败：${error.message ?? error}`;
+    els.samplesResult.style.color = "var(--bad)";
   }
 }
 
@@ -342,6 +403,7 @@ async function main() {
   els.file.addEventListener("change", onFile);
   els.selfCheck.addEventListener("click", runSelfCheck);
   els.benchmark.addEventListener("click", runBenchmark);
+  loadSamples();
   els.copy.addEventListener("click", copyResult);
 }
 

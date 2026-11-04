@@ -1,0 +1,102 @@
+{
+  "note": "Selection is the first two recordings per class, sorted by file name. No prediction was consulted when choosing them.",
+  "class_order": [
+    "AS",
+    "MS",
+    "MR",
+    "MVP",
+    "N"
+  ],
+  "items": [
+    {
+      "file": "AS_001.wav",
+      "label": "AS",
+      "recording_id": "New_AS_001",
+      "seconds": 2.606,
+      "sample_rate_hz": 8000,
+      "bytes": 41742,
+      "sha256": "bcf99c26e2f6dd3fc47b9fddefef45aa93af28cab3d14034d77678e1e0346300"
+    },
+    {
+      "file": "AS_002.wav",
+      "label": "AS",
+      "recording_id": "New_AS_002",
+      "seconds": 2.607,
+      "sample_rate_hz": 8000,
+      "bytes": 41752,
+      "sha256": "01e4c61760fae276f17dea0c74b007674937269686165a896200c4cecfc17258"
+    },
+    {
+      "file": "MS_001.wav",
+      "label": "MS",
+      "recording_id": "New_MS_001",
+      "seconds": 2.953,
+      "sample_rate_hz": 8000,
+      "bytes": 47296,
+      "sha256": "740f565b3293869704851df7fd83860cec93916b169b8e4dfdb6354636f3d9af"
+    },
+    {
+      "file": "MS_002.wav",
+      "label": "MS",
+      "recording_id": "New_MS_002",
+      "seconds": 2.881,
+      "sample_rate_hz": 8000,
+      "bytes": 46144,
+      "sha256": "97a7a0b83ee6fa09bc48ec68802dbccbc7a9ced52d1d0bbb5d915d4163481c42"
+    },
+    {
+      "file": "MR_001.wav",
+      "label": "MR",
+      "recording_id": "New_MR_001",
+      "seconds": 2.099,
+      "sample_rate_hz": 8000,
+      "bytes": 33634,
+      "sha256": "ced27fd4a6dc64b6ae5949952e96bb6c8e3f61ca707bc6f2108eebd887d0f1c3"
+    },
+    {
+      "file": "MR_002.wav",
+      "label": "MR",
+      "recording_id": "New_MR_002",
+      "seconds": 2.084,
+      "sample_rate_hz": 8000,
+      "bytes": 33396,
+      "sha256": "597e1424931011fbcbed37d2e2609464a2dc54f07397042e2e10a21dd1957ec2"
+    },
+    {
+      "file": "MVP_001.wav",
+      "label": "MVP",
+      "recording_id": "New_MVP_001",
+      "seconds": 2.789,
+      "sample_rate_hz": 8000,
+      "bytes": 44666,
+      "sha256": "79765f49b53dc6b7b9b6f02448935a7aef00fe66e596fad3cdc41ee8cdfa4e66"
+    },
+    {
+      "file": "MVP_002.wav",
+      "label": "MVP",
+      "recording_id": "New_MVP_002",
+      "seconds": 3.975,
+      "sample_rate_hz": 8000,
+      "bytes": 63646,
+      "sha256": "2592a50e7efef3daca67480c792edf8de7cb103a19675aa287a6378c7c141eeb"
+    },
+    {
+      "file": "N_001.wav",
+      "label": "N",
+      "recording_id": "New_N_001",
+      "seconds": 2.105,
+      "sample_rate_hz": 8000,
+      "bytes": 33718,
+      "sha256": "573347424ed24012db8d9336394227a1eef53432f6204f11a2d11daa3c1294a2"
+    },
+    {
+      "file": "N_002.wav",
+      "label": "N",
+      "recording_id": "New_N_002",
+      "seconds": 2.119,
+      "sample_rate_hz": 8000,
+      "bytes": 33956,
+      "sha256": "68c46dfc7b1fa6f1d2e6481c5eee6ff0db9bb4ddc87aacedeb439a40b8c507d0"
+    }
+  ]
+}
