@@ -63,7 +63,25 @@ scripts/serve-pwa.sh 9000     # 换端口
 
 **注意**：`PASS` 的前提是页面用 `model/model.json` 这份权重；换模型后必须重跑上面三条命令。
 
-## 5. 重新生成
+## 5. 常见故障：手机一直显示"模型加载中"
+
+**先看页面自己打的诊断**（15 秒后自动出现，把那段文字发出来即可定位）。
+
+最典型的一个坑，我们真踩过：
+
+| 现象 | 根因 | 修法 |
+| --- | --- | --- |
+| 手机上一直"模型加载中"，诊断里 4 个文件全 OK、tf 也 OK，但 `FAIL ES module 解析：Failed to fetch dynamically imported module` | **Windows 上 `HKEY_CLASSES_ROOT\.js\Content Type` 被改成了 `text/plain`**，Python 的 `http.server` 跟着把 `.js` 当纯文本发出去；浏览器对**经典脚本**宽容，对 **ES module 严格**，于是 `app.js`/`preprocess.js` 全被拒 | 用 `scripts/serve-pwa.py` 起服务（它把 `.js` 钉死为 `text/javascript`），不要用 `python -m http.server` |
+
+验证一条命令：
+
+```bash
+python3 scripts/serve-pwa.py --self-check     # 逐个断言 Content-Type
+```
+
+**为什么只有手机出问题、电脑好像没事**：电脑浏览器缓存了之前用正确服务器（WSL 里的 Linux python）加载过的页面；一旦换成 Windows 那台 `http.server`，两边都会挂，只是没人刷新。
+
+## 6. 重新生成
 
 ```bash
 # 1) 训练全量模型（约 2 min）
