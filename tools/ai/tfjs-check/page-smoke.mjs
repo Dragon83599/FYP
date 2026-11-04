@@ -58,9 +58,20 @@ globalThis.fetch = async (url) => {
   const file = path.join(PWA, relative);
   if (!fs.existsSync(file)) return { ok: false, status: 404, json: async () => { throw new Error("404"); } };
   const buffer = fs.readFileSync(file);
+  const types = {
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".json": "application/json",
+    ".bin": "application/octet-stream",
+    ".wav": "audio/wav",
+    ".png": "image/png",
+    ".md": "text/plain",
+  };
+  const contentType = types[path.extname(file)] ?? "application/octet-stream";
   return {
     ok: true,
     status: 200,
+    headers: { get: (name) => (String(name).toLowerCase() === "content-type" ? contentType : null) },
     arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
     json: async () => JSON.parse(buffer.toString("utf8")),
   };

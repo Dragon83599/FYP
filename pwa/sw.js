@@ -17,7 +17,7 @@
  * the list covers every file the page fetches).
  */
 
-const CACHE_VERSION = "pcg-demo-v1";
+const CACHE_VERSION = "pcg-demo-v2";
 const CACHE = `pcg-demo-${CACHE_VERSION}`;
 
 // Everything the page asks for. Missing one entry means that file silently
@@ -39,6 +39,18 @@ const PRECACHE = [
   "./model/New_AS_001.wav",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  // Labelled clips for the one-tap demo (see tools/ai/make_demo_samples.py).
+  "./samples/index.json",
+  "./samples/AS_001.wav",
+  "./samples/AS_002.wav",
+  "./samples/MS_001.wav",
+  "./samples/MS_002.wav",
+  "./samples/MR_001.wav",
+  "./samples/MR_002.wav",
+  "./samples/MVP_001.wav",
+  "./samples/MVP_002.wav",
+  "./samples/N_001.wav",
+  "./samples/N_002.wav",
 ];
 
 self.addEventListener("install", (event) => {

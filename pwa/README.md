@@ -33,6 +33,7 @@ scripts/serve-pwa.sh 9000     # 换端口
 | 功能 | 说明 |
 | --- | --- |
 | 选 wav 分类 | 只接受 **8 kHz**、PCM 的 wav；显示五类概率条与判读 |
+| 样音一键试 | 10 条带标签的样音（每类 2 条），点一下直接判读，并显示**真实标签 vs 判读**与累计正确数——手机上不用先传文件 |
 | 一致性自检 | 点一下就自动加载 `model/New_AS_001.wav`，用**页面自己的预处理**跑一遍，与 Keras 的参考概率比，判据 **<1e-3** |
 | 测 20 次时延 | 预热 1 次后跑 20 次，报**中位 / P95 / 最小 / 最大**，并按 W2 判据（中位 ≤1 s、P95 ≤2 s）给"达标/未达标" |
 | 复制结果 | 把自检 + 时延的完整 JSON（含后端、tfjs 版本、UA）复制到剪贴板，便于留证或贴回报告 |
@@ -67,7 +68,7 @@ scripts/serve-pwa.sh 9000     # 换端口
 | 模型数值（Python ↔ tfjs） | ✅ 最大差 **1.19e-7** | `node tools/ai/tfjs-check/check.mjs` |
 | 端到端（wav → 概率） | ✅ 最大差 **1.19e-7**，预处理样本级差 **0** | `node tools/ai/tfjs-check/e2e.mjs` |
 | 页面代码路径 | ✅ 用 DOM shim 跑通加载 + 自检 | `node tools/ai/tfjs-check/page-smoke.mjs` |
-| 静态完整性（id/路径/参数量） | ✅ 6 项，进 CI | `npm test` |
+| 静态完整性（id/路径/参数量/预缓存覆盖） | ✅ 9 项，进 CI | `npm test` |
 | 时延测量按钮（Node CPU 后端） | ✅ 中位 **12.0 ms**、P95 **13.7 ms**（20 次，预热 1 次） | `node tools/ai/tfjs-check/page-smoke.mjs` |
 | **真实浏览器 + WebGL 后端** | ✅ 安卓 Edge 实测：后端 **webgl**，端到端 **1.88e-12**，样本级 **0** | 2026-11-04 |
 | **手机端时延**（中位 ≤1 s / P95 ≤2 s） | ✅ 安卓 Edge/WebGL：中位 **4.4 ms**、P95 **5.1 ms**（20 次） | 2026-11-04 |

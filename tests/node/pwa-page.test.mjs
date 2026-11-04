@@ -126,6 +126,16 @@ test("the service worker precaches every file the page fetches", () => {
   }
   assert.ok(cached.has("model/group1-shard1of1.bin"), "the weights must be cached");
   assert.ok(cached.has("vendor/tf.min.js"), "the TF.js bundle must be cached");
+
+  // The sample clips are listed in samples/index.json rather than in the source,
+  // so they need their own check: a clip that is not cached makes the one-tap
+  // demo fail only when the phone is offline.
+  const samples = JSON.parse(read("samples/index.json"));
+  assert.ok(samples.items.length >= 5, "expected one-tap samples for the demo");
+  for (const item of samples.items) {
+    assert.ok(existsSync(path.join(PWA, "samples", item.file)), `samples/${item.file} is missing`);
+    assert.ok(cached.has(`samples/${item.file}`), `sw.js does not precache samples/${item.file}`);
+  }
 });
 
 test("the icons are real PNGs at the advertised sizes", () => {
