@@ -186,6 +186,6 @@
 
 以上内容保留在：
 
-`docs/group-meeting-2026-10-06-detailed-reference.md`
+`docs/archive/2026-10-legacy/group-meeting-2026-10-06-detailed-reference.md`
 
 如果老师追问，再按对应章节补充说明即可。
