@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>runoob 学习路径 · 心音五分类 FYP</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fg: #16181d; --bg: #f7f7f9; --card: #fff; --muted: #6b7280;
+    --line: #e5e7eb; --accent: #0a7d32; --must: #0a7d32; --opt: #a16207; --skip: #9ca3af;
+    --done-bg: #ecfdf3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #e8e8ea; --bg: #121316; --card: #1b1d22; --muted: #9aa0aa;
+            --line: #2c2f36; --accent: #6cd58b; --must: #6cd58b; --opt: #e0a94a;
+            --skip: #6b7280; --done-bg: #12301f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.6 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg);
+           border-bottom: 1px solid var(--line); padding: .7rem 1rem .6rem; }
+  h1 { font-size: 1.05rem; margin: 0 0 .35rem; }
+  .sub { color: var(--muted); font-size: .8rem; margin: 0 0 .55rem; }
+  .bar { height: .5rem; background: var(--line); border-radius: .3rem; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+  .row { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; margin-top: .55rem; }
+  button, input[type=search] { font: inherit; color: inherit; background: var(--card);
+    border: 1px solid var(--line); border-radius: .45rem; padding: .3rem .6rem; }
+  button { cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); }
+  input[type=search] { flex: 1 1 10rem; min-width: 8rem; }
+  main { padding: .8rem 1rem 4rem; max-width: 52rem; margin: 0 auto; }
+  ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  li { counter-increment: step; background: var(--card); border: 1px solid var(--line);
+       border-radius: .6rem; padding: .7rem .8rem .6rem 2.9rem; margin-bottom: .6rem;
+       position: relative; }
+  li.done { background: var(--done-bg); }
+  li::before { content: counter(step); position: absolute; left: .7rem; top: .65rem;
+       width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--line);
+       color: var(--fg); font-size: .78rem; font-weight: 700;
+       display: flex; align-items: center; justify-content: center; }
+  li.done::before { background: var(--accent); color: #fff; }
+  .title { font-weight: 600; margin: 0 0 .15rem; }
+  .title a { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
+  .title a:hover { border-bottom-style: solid; }
+  .tier { font-size: .68rem; font-weight: 700; padding: .05rem .35rem; border-radius: .25rem;
+          border: 1px solid currentColor; margin-left: .35rem; vertical-align: .1em; }
+  .tier.must { color: var(--must); } .tier.opt { color: var(--opt); } .tier.skip { color: var(--skip); }
+  .why { color: var(--muted); font-size: .84rem; margin: .1rem 0 .25rem; }
+  .check { font-size: .84rem; margin: .1rem 0 .35rem; }
+  .check b { color: var(--accent); font-weight: 600; }
+  .cmd { display: flex; gap: .4rem; align-items: flex-start; margin-top: .3rem; }
+  .cmd code { flex: 1; background: #8881; border-radius: .35rem; padding: .35rem .5rem;
+              font: .76rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+              white-space: pre-wrap; word-break: break-all; }
+  .cmd button { padding: .15rem .45rem; font-size: .74rem; }
+  label.donebox { position: absolute; right: .7rem; top: .65rem; display: flex; gap: .3rem;
+                  align-items: center; font-size: .74rem; color: var(--muted); cursor: pointer; }
+  input[type=checkbox] { width: 1.05rem; height: 1.05rem; accent-color: var(--accent); }
+  #empty { color: var(--muted); text-align: center; padding: 2rem 0; display: none; }
+  footer { max-width: 52rem; margin: 0 auto; padding: 0 1rem 3rem; color: var(--muted); font-size: .78rem; }
+  @media print { header .row, label.donebox, .cmd button, footer { display: none; } li { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>runoob 学习路径 · 按顺序</h1>
+  <p class="sub" id="summary">共 <b id="total">0</b> 条 · 已学 <b id="doneCount">0</b> 条</p>
+  <div class="bar"><i id="progress"></i></div>
+  <div class="row">
+    <button data-filter="all" class="on">全部</button>
+    <button data-filter="must">只看必学</button>
+    <button data-filter="todo">未完成</button>
+    <button data-filter="opt">选学</button>
+    <input type="search" id="q" placeholder="搜索：F1 / 交叉验证 / Git / SciPy…" />
+    <button id="copy">复制进度</button>
+    <button id="reset">重置</button>
+  </div>
+</header>
+
+<main>
+  <ol id="list"></ol>
+  <p id="empty">没有匹配的条目。</p>
+</main>
+
+<footer>
+  进度保存在本浏览器的 localStorage；换设备或清缓存会丢，可用「复制进度」留档。
+  链接指向 <a href="https://www.runoob.com/" target="_blank" rel="noopener">runoob.com</a>，内容以站方为准。
+</footer>
+
+<script>
+// 学习条目：顺序 = 建议学习顺序，不按天。
+// tier: must 必学 / opt 选学 / skip 不学（保留是为了让你知道"这些可以放心跳过"）
+const ITEMS = [
+  // ---------- A. Python ----------
+  { t: "Python3 教程 · 基础语法与变量", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "项目里所有脚本都是 Python；先能读懂变量的类型。",
+    check: "变量、字符串、数字三种类型各写一个，用 print 打出来。" },
+  { t: "Python3 · 条件与运算符", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "读代码时最常见的 if/比较运算。",
+    check: "写一个 if 判断：分数大于 60 打印“及格”，否则“不及格”。" },
+  { t: "Python3 · 循环（for / while）", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "遍历 1,000 条录音、遍历 10 折都是循环。",
+    check: "用 for 打印 1 到 10；再用 while 打印一遍。" },
+  { t: "Python3 · 字符串", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "文件名解析、报告里的格式化输出都靠它。",
+    check: "把 \"New_AS_001.wav\" 去掉前缀和后缀，得到 \"AS_001\"。" },
+  { t: "Python3 · 列表", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "装样本、装路径、装结果。",
+    check: "建一个列表放 5 个数，取第 2 个、再加一个到末尾。" },
+  { t: "Python3 · 字典", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "report.json 就是字典套字典。",
+    check: "用字典存 {\"AS\": 98.6, \"N\": 100.0}，取出 AS 的值。" },
+  { t: "Python3 · 函数（定义与参数）", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "crop_or_pad、pooled_metrics 都是函数。",
+    check: "写一个函数，输入列表返回最大值。" },
+  { t: "Python3 · 文件读写（with open）", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "读 wav、读 csv、写 report.json。",
+    check: "把一个字符串写进文件，再读回来打印。" },
+  { t: "Python3 · 异常处理（try / except）", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "我们的脚本用 SystemExit 和 try/except 做失败保护。",
+    check: "读一个不存在的文件，捕获异常并打印提示。" },
+  { t: "Python3 · 模块与 import", u: "https://www.runoob.com/python3/python3-tutorial.html", tier: "must",
+    why: "repro_ma2023.py 里的 import 全靠这一节。",
+    check: "说清 import numpy as np 这句在干什么。" },
+
+  // ---------- B. NumPy ----------
+  { t: "NumPy · 数组与 shape", u: "https://www.runoob.com/numpy/numpy-tutorial.html", tier: "must",
+    why: "所有数据都是数组；windows.npy 的形状是 (1791, 4000)。",
+    check: "建一个 2 行 3 列的数组，打印它的 shape。" },
+  { t: "NumPy · 索引与切片", u: "https://www.runoob.com/numpy/numpy-tutorial.html", tier: "must",
+    why: "截前 2,000 个点（x[:2000]）、取某一折的数据都靠切片。",
+    check: "从长度为 10 的数组里取前 3 个、后 3 个、每隔 1 个取一个。" },
+  { t: "NumPy · 形状变换（reshape / flatten）", u: "https://www.runoob.com/numpy/numpy-tutorial.html", tier: "must",
+    why: "模型输入是 (1000, 2000, 1)，混淆矩阵是 (5,5)。",
+    check: "把长度 12 的数组改成 3×4。" },
+  { t: "NumPy · 布尔索引", u: "https://www.runoob.com/numpy/numpy-tutorial.html", tier: "must",
+    why: "数“每类多少条”、筛“预测错误的样本”都用它。",
+    check: "用一个布尔条件，从数组里挑出所有大于 5 的元素。" },
+  { t: "NumPy · 统计与 axis", u: "https://www.runoob.com/numpy/numpy-tutorial.html", tier: "must",
+    why: "算均值、标准差、按列求和（混淆矩阵算 F1）全靠 axis。",
+    check: "对一个 5×5 矩阵分别按行、按列求和，说出 axis 的区别。" },
+  { t: "NumPy · 广播", u: "https://www.runoob.com/numpy/numpy-tutorial.html", tier: "opt",
+    why: "预处理的归一化、概率批量处理会用到。",
+    check: "用一个标量去乘整个数组，再用不同形状的两个数组相加。" },
+  { t: "NumPy · 随机数", u: "https://www.runoob.com/numpy/numpy-tutorial.html", tier: "opt",
+    why: "随机种子决定结果能不能复现（我们做过“同 seed 两次跑”的验证）。",
+    check: "说出 np.random.default_rng(42) 里的 42 为什么重要。" },
+
+  // ---------- C. 机器学习概念 ----------
+  { t: "机器学习 · 基础术语", u: "https://www.runoob.com/ml/ml-basics.html", tier: "must",
+    why: "训练/验证/测试、特征、标签——不懂这些，后面的评估全是空话。",
+    check: "说清训练集、验证集、测试集各自允许用来做什么。" },
+  { t: "机器学习 · 数据理解", u: "https://www.runoob.com/ml/ml-data-understanding.html", tier: "must",
+    why: "我们做的第一件事就是量数据：1,000 条、8 kHz、1.16–3.99 秒。",
+    check: "说清“先量数据再建模”能避免哪一类错误。" },
+  { t: "机器学习 · 特征工程", u: "https://www.runoob.com/ml/ml-feature-engineering.html", tier: "opt",
+    why: "我们的 A1/A2 臂用的是 MFCC / log-mel 特征，属于这一节的内容。",
+    check: "说清“特征”和“原始信号”的区别。" },
+  { t: "机器学习 · 训练集 / 测试集划分", u: "https://www.runoob.com/ml/ml-training-and-test-set-splitting.html", tier: "must",
+    why: "为什么不能拿训练数据评估——这是全部评估的地基。",
+    check: "说清“用训练数据评估”为什么等于作弊。" },
+  { t: "机器学习 · 交叉验证", u: "https://www.runoob.com/ml/ml-cross-validation.html", tier: "must",
+    why: "我们的 98.40% 就是 10 折交叉验证的均值。",
+    check: "说清 10 折里每一折的“课本”和“考卷”分别是什么。" },
+  { t: "机器学习 · 数据泄漏 ★", u: "https://www.runoob.com/ml/ml-model-optimization-data-leakage.html", tier: "must",
+    why: "同一条录音的两个窗分到不同折，就是泄漏；我们为此量了“每条只出 1 个窗”。",
+    check: "举一个“看起来没问题、实际是泄漏”的例子。" },
+  { t: "机器学习 · 过拟合 / 欠拟合 / 偏差与方差", u: "https://www.runoob.com/ml/ml-overfitting-underfitting-bias-and-variance.html", tier: "must",
+    why: "早停太早是欠拟合；训满 100 轮有个别折反而掉点是过拟合。",
+    check: "说清早停停太早属于哪一种，为什么。" },
+  { t: "机器学习 · 损失函数与梯度", u: "https://www.runoob.com/ml/ml-loss-function-and-gradient.html", tier: "must",
+    why: "训练就是“算损失 → 调参数”，学习率决定每步迈多大。",
+    check: "说清“损失变小”和“准确率变高”为什么不是同一件事。" },
+  { t: "机器学习 · 分类指标 ★", u: "https://www.runoob.com/ml/ml-classification-metrics.html", tier: "must",
+    why: "混淆矩阵、precision、recall、F1——你刚把主指标改成 macro F1，这一节是依据。",
+    check: "给一个 5×5 混淆矩阵，手算其中一类的 F1。" },
+  { t: "机器学习 · 统计学基础", u: "https://www.runoob.com/ml/ml-foundations-of-statistics.html", tier: "must",
+    why: "置信区间、标准差——为什么我们报 [98.01, 98.79] 而不是一个数。",
+    check: "说清 95% 置信区间在说什么、不在说什么。" },
+  { t: "机器学习 · 常见问题排查", u: "https://www.runoob.com/ml/ml-model-optimization-common-problems.html", tier: "must",
+    why: "结果偏低时按什么顺序查：先结构、再数据、再训练。",
+    check: "说出你会先查哪三样，为什么是这个顺序。" },
+  { t: "机器学习 · 正则化", u: "https://www.runoob.com/ml/ml-model-optimization-regularization.html", tier: "opt",
+    why: "dropout、权重衰减都属于它；我们的模型小，暂未使用。",
+    check: "说清正则化在防什么。" },
+  { t: "机器学习 · 超参搜索", u: "https://www.runoob.com/ml/ml-hyperparameter-search.html", tier: "opt",
+    why: "我们的学习率/batch 是定的；W3 若需要搜，按这一节的做法只在训练折内搜。",
+    check: "说清为什么不能在测试集上搜超参。" },
+  { t: "机器学习 · 神经网络的基本结构", u: "https://www.runoob.com/ml/ml-structure-of-neural-networks.html", tier: "must",
+    why: "看懂 20,193 参数是怎么数出来的前提。",
+    check: "说清“层”“神经元”“参数”三者的关系。" },
+  { t: "机器学习 · 前向传播与反向传播", u: "https://www.runoob.com/ml/ml-forward-and-backward-propagation.html", tier: "must",
+    why: "前向=算结果，反向=调参数；训练循环就是这两件事。",
+    check: "用一句话说清“反向传播在算什么”。" },
+  { t: "机器学习 · 深度学习 vs 传统机器学习", u: "https://www.runoob.com/ml/ml-deep-learning-traditional-machine-learning.html", tier: "opt",
+    why: "答辩常被问“为什么不用 SVM/随机森林”。",
+    check: "说出至少一条“小数据下传统方法可能更好”的理由。" },
+  { t: "机器学习 · 常见网络类型", u: "https://www.runoob.com/ml/ml-common-network-types.html", tier: "opt",
+    why: "知道 CNN/RNN/Transformer 的分工，能说明我们为何选 1D CNN。",
+    check: "说清 1D 卷积和一维信号为什么匹配。" },
+  { t: "机器学习 · 逻辑回归", u: "https://www.runoob.com/ml/ml-logistic-regression.html", tier: "opt",
+    why: "项目里 A1 臂的基线分类器之一。",
+    check: "说清逻辑回归输出的是什么。" },
+  { t: "机器学习 · 支持向量机", u: "https://www.runoob.com/ml/ml-svm.html", tier: "opt",
+    why: "A1 臂的另一半（RBF-SVM）。",
+    check: "说清“间隔最大化”在直观上是什么意思。" },
+  { t: "机器学习 · 机器学习生命周期", u: "https://www.runoob.com/ml/ml-project-lifecycle.html", tier: "opt",
+    why: "写论文“方法”一章的骨架。",
+    check: "把我们的流程套进它的阶段里。" },
+  { t: "机器学习 · 限制与边界（可解释性/假设/偏差/成本）", u: "https://www.runoob.com/ml/ml-interpretability-problem.html", tier: "opt",
+    why: "W4 写“局限性”时直接可用。",
+    check: "说出我们项目至少两条真实局限。" },
+
+  // ---------- D. 信号处理 ----------
+  { t: "SciPy · 教程总览（找 signal 那一章）", u: "https://www.runoob.com/scipy/scipy-tutorial.html", tier: "must",
+    why: "降采样、滤波、功率谱——预处理的核心库。",
+    check: "找到 signal 章节，列出它提供的三类函数（滤波/重采样/谱分析）。" },
+  { t: "SciPy · signal · 重采样（resample_poly）", u: "https://www.runoob.com/scipy/scipy-tutorial.html", tier: "must",
+    why: "8 kHz → 1 kHz 就是它；用 x[::8] 会造出假音。",
+    check: "能解释抗混叠滤波在抽取之前做什么。" },
+  { t: "SciPy · signal · 滤波器（butter / sosfiltfilt）", u: "https://www.runoob.com/scipy/scipy-tutorial.html", tier: "must",
+    why: "主线 20–1000 Hz 带通用它；sosfiltfilt 是零相位（不搬移波形）。",
+    check: "说清“零相位”解决了什么问题。" },
+  { t: "SciPy · signal · 功率谱（welch）", u: "https://www.runoob.com/scipy/scipy-tutorial.html", tier: "opt",
+    why: "BER 指标就是用它算的。",
+    check: "说清“功率谱”和“波形”分别回答什么问题。" },
+
+  // ---------- E. 可视化 ----------
+  { t: "Matplotlib · 基础绘图", u: "https://www.runoob.com/matplotlib/matplotlib-tutorial.html", tier: "must",
+    why: "组会每一张图都要你自己能改。",
+    check: "画一条折线并保存成 png。" },
+  { t: "Matplotlib · 直方图与子图", u: "https://www.runoob.com/matplotlib/matplotlib-tutorial.html", tier: "must",
+    why: "BER 分布画直方图；多个折的结果画子图对比。",
+    check: "一张图上画两个子图，左边直方图、右边折线。" },
+  { t: "Matplotlib · 热图（imshow 画混淆矩阵）", u: "https://www.runoob.com/matplotlib/matplotlib-tutorial.html", tier: "must",
+    why: "混淆矩阵用热图最直观，答辩必用。",
+    check: "把 5×5 混淆矩阵画成带数字的热图。" },
+
+  // ---------- F. 工程 ----------
+  { t: "Git · 基础（status / add / commit / log / diff）", u: "https://www.runoob.com/git/git-tutorial.html", tier: "must",
+    why: "我这两天做了 20 多个提交，你要能自己复查改了什么。",
+    check: "改一行代码 → 看 diff → 提交 → 看 log。" },
+  { t: "Git · 分支与回滚", u: "https://www.runoob.com/git/git-tutorial.html", tier: "must",
+    why: "出错时要能退回去，而不是重写整个文件。",
+    check: "建一个分支、切回来、再撤销一次提交。" },
+  { t: "Markdown 教程", u: "https://www.runoob.com/markdown/md-tutorial.html", tier: "opt",
+    why: "仓库里的文档全是 Markdown；写周报、记录实验都要用。",
+    check: "用 Markdown 写一个带表格和代码块的实验记录。" },
+  { t: "LaTeX 教程", u: "https://www.runoob.com/latex/latex-tutorial.html", tier: "opt",
+    why: "论文里的公式（F1、卷积）用得上。",
+    check: "写一个 F1 公式。" },
+
+  // ---------- G. 前端（看懂 PWA 用） ----------
+  { t: "JavaScript · 基础语法与函数", u: "https://www.runoob.com/js/js-tutorial.html", tier: "must",
+    why: "pwa/app.js 只有 300 行，语法就是这些。",
+    check: "写一个函数，接收数组返回最大值。" },
+  { t: "JavaScript · 数组与对象", u: "https://www.runoob.com/js/js-tutorial.html", tier: "must",
+    why: "model.json 解析出来是对象，概率是数组。",
+    check: "从对象里取一个字段、对数组求和。" },
+  { t: "JavaScript · Promise / async / await", u: "https://www.runoob.com/js/js-tutorial.html", tier: "must",
+    why: "加载模型、读 wav 全是异步操作。",
+    check: "说清 await fetch(...) 在等什么。" },
+  { t: "AJAX / fetch 请求", u: "https://www.runoob.com/ajax/ajax-tutorial.html", tier: "must",
+    why: "页面靠它拿 model.json 和权重文件。",
+    check: "说清一次 fetch 从发出到拿到数据经历了什么。" },
+  { t: "HTML DOM · 查找元素与事件", u: "https://www.runoob.com/htmldom/htmldom-tutorial.html", tier: "must",
+    why: "按钮点击、结果写入页面都靠 DOM。",
+    check: "给一个按钮绑定点击事件，点击后改一行文字。" },
+  { t: "JSON 教程", u: "https://www.runoob.com/json/json-tutorial.html", tier: "must",
+    why: "report.json / model.json / manifest.json 都是 JSON。",
+    check: "手写一个含数组和嵌套对象的 JSON，并解析它。" },
+  { t: "HTTP 教程（状态码 / Content-Type）", u: "https://www.runoob.com/http/http-tutorial.html", tier: "must",
+    why: "我们踩过的坑：.js 被当成 text/plain，模块就全被浏览器拒绝。",
+    check: "说清 200 和 404 的区别，以及 Content-Type 为什么会影响能不能跑。" },
+
+  // ---------- H. 深度学习框架 ----------
+  { t: "TensorFlow 教程 · Sequential / Conv1D / fit / save", u: "https://www.runoob.com/tensorflow/tensorflow-tutorial.html", tier: "opt",
+    why: "想自己改模型、重训时需要；复现已完成，不改也能交付。",
+    check: "用 Keras 搭一个 3 层 Sequential 并打印参数量。" },
+];
+
+const FILTERS = { all: () => true, must: (i) => i.tier === "must", opt: (i) => i.tier === "opt",
+                  todo: (i, n) => !done.has(n) };
+const TIER_LABEL = { must: "必学", opt: "选学", skip: "不学" };
+const STORE = "runoob-path-v1";
+
+const listEl = document.getElementById("list");
+const emptyEl = document.getElementById("empty");
+const totalEl = document.getElementById("total");
+const doneCountEl = document.getElementById("doneCount");
+const progressEl = document.getElementById("progress");
+const summaryEl = document.getElementById("summary");
+const qEl = document.getElementById("q");
+
+let filter = "all";
+let query = "";
+const done = new Set();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE);
+    if (raw) JSON.parse(raw).forEach((n) => done.add(n));
+  } catch (e) { /* 隐私模式或 file:// 限制：照常工作，只是不保存 */ }
+}
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify([...done])); } catch (e) {}
+}
+
+function matches(item, n) {
+  if (!FILTERS[filter](item, n)) return false;
+  if (!query) return true;
+  const hay = (item.t + " " + item.why + " " + item.check).toLowerCase();
+  return hay.includes(query);
+}
+
+function render() {
+  listEl.innerHTML = "";
+  let shown = 0;
+  ITEMS.forEach((item, idx) => {
+    const n = idx + 1;
+    if (!matches(item, n)) return;
+    shown += 1;
+    const li = document.createElement("li");
+    li.className = done.has(n) ? "done" : "";
+
+    const title = document.createElement("p");
+    title.className = "title";
+    const a = document.createElement("a");
+    a.href = item.u;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = item.t;
+    title.appendChild(a);
+    const tier = document.createElement("span");
+    tier.className = "tier " + item.tier;
+    tier.textContent = TIER_LABEL[item.tier];
+    title.appendChild(tier);
+    li.appendChild(title);
+
+    const why = document.createElement("p");
+    why.className = "why";
+    why.textContent = item.why;
+    li.appendChild(why);
+
+    const check = document.createElement("p");
+    check.className = "check";
+    check.innerHTML = "<b>学完要能回答：</b>";
+    check.appendChild(document.createTextNode(item.check));
+    li.appendChild(check);
+
+    const box = document.createElement("label");
+    box.className = "donebox";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = done.has(n);
+    cb.setAttribute("aria-label", "标记第 " + n + " 条为已学");
+    cb.addEventListener("change", () => {
+      if (cb.checked) done.add(n); else done.delete(n);
+      save();
+      li.classList.toggle("done", cb.checked);
+      updateProgress();
+    });
+    box.appendChild(cb);
+    box.appendChild(document.createTextNode("已学"));
+    li.appendChild(box);
+
+    listEl.appendChild(li);
+  });
+  emptyEl.style.display = shown ? "none" : "block";
+  updateProgress();
+}
+
+function updateProgress() {
+  const mustTotal = ITEMS.filter((i) => i.tier === "must").length;
+  const mustDone = ITEMS.filter((i, idx) => i.tier === "must" && done.has(idx + 1)).length;
+  totalEl.textContent = ITEMS.length;
+  doneCountEl.textContent = done.size;
+  progressEl.style.width = (mustTotal ? (mustDone / mustTotal) * 100 : 0) + "%";
+  summaryEl.innerHTML = "共 <b>" + ITEMS.length + "</b> 条 · 已学 <b>" + done.size +
+    "</b> 条 · 必学进度 <b>" + mustDone + "/" + mustTotal + "</b>（进度条按必学算）";
+}
+
+document.querySelectorAll("[data-filter]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("[data-filter]").forEach((b) => b.classList.remove("on"));
+    btn.classList.add("on");
+    filter = btn.dataset.filter;
+    render();
+  });
+});
+
+qEl.addEventListener("input", () => { query = qEl.value.trim().toLowerCase(); render(); });
+
+document.getElementById("copy").addEventListener("click", async () => {
+  const lines = ["runoob 学习路径进度：已学 " + done.size + "/" + ITEMS.length];
+  ITEMS.forEach((item, idx) => {
+    const n = idx + 1;
+    lines.push((done.has(n) ? "[x] " : "[ ] ") + n + ". " + item.t + (item.tier === "must" ? "（必学）" : ""));
+  });
+  const text = lines.join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    summaryEl.textContent = "进度已复制到剪贴板";
+  } catch (e) {
+    window.prompt("复制下面这段：", text);
+  }
+});
+
+document.getElementById("reset").addEventListener("click", () => {
+  if (!confirm("清空全部已学标记？")) return;
+  done.clear();
+  save();
+  render();
+});
+
+load();
+render();
+</script>
+</body>
+</html>
