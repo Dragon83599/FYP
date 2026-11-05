@@ -35,14 +35,46 @@ class StubElement {
   fire(type, event = {}) { return this.listeners[type]?.(event); }
 }
 
+// A canvas stub that records what the drawing code does, so the waveform path
+// is exercised instead of skipped: we assert it draws a polyline and a plausible
+// number of peak markers for a three-beat clip.
+const canvasCalls = { moveTo: 0, lineTo: 0, arc: 0 };
+
+class StubCanvas extends StubElement {
+  constructor(id) {
+    super(id);
+    this.width = 640;
+    this.height = 180;
+    this.clientWidth = 640;
+    this.clientHeight = 180;
+    this.style = {};
+  }
+  getContext() {
+    return {
+      setTransform() {},
+      clearRect() {},
+      beginPath() {},
+      moveTo() { canvasCalls.moveTo += 1; },
+      lineTo() { canvasCalls.lineTo += 1; },
+      stroke() {},
+      arc() { canvasCalls.arc += 1; },
+      fill() {},
+      strokeStyle: "", lineWidth: 1, fillStyle: "",
+    };
+  }
+}
+
 const elements = new Map();
 globalThis.document = {
   getElementById(id) {
-    if (!elements.has(id)) elements.set(id, new StubElement(id));
+    if (!elements.has(id)) {
+      elements.set(id, id === "waveform" ? new StubCanvas(id) : new StubElement(id));
+    }
     return elements.get(id);
   },
   createElement() { return new StubElement("created"); },
 };
+globalThis.devicePixelRatio = 2;
 
 globalThis.performance = globalThis.performance ?? { now: () => Date.now() };
 // app.js touches a couple of `window` globals (the "did the model load" flag the
@@ -110,6 +142,37 @@ if (params.replace(/[^0-9]/g, "") !== "20193") {
 if (!check?.listeners?.click) {
   console.error("the self-check button has no handler");
   process.exitCode = 1;
+}
+
+// One-tap sample: exercises the waveform drawing on a real clip.
+const sampleButtons = elements.get("samples")?.children ?? [];
+if (sampleButtons.length === 0) {
+  console.error("no sample buttons were rendered");
+  process.exitCode = 1;
+} else {
+  await sampleButtons[0].listeners.click();
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  const note = elements.get("waveform-note")?.textContent ?? "";
+  const result = elements.get("samples-result")?.textContent ?? "";
+  console.log(JSON.stringify({
+    samples_rendered: sampleButtons.length,
+    sample_result: result,
+    waveform_note: note,
+    canvas_calls: canvasCalls,
+  }, null, 2));
+  if (canvasCalls.lineTo < 100) {
+    console.error(`waveform drew only ${canvasCalls.lineTo} segments`);
+    process.exitCode = 1;
+  }
+  // 2 s at 40-200 bpm is 1.3-6.7 beats; the 250 ms refractory caps it at 8.
+  if (canvasCalls.arc < 2 || canvasCalls.arc > 8) {
+    console.error(`expected a handful of peak markers, drew ${canvasCalls.arc}`);
+    process.exitCode = 1;
+  }
+  if (!/2,000 点/.test(note)) {
+    console.error("waveform caption does not describe the 2,000-point input");
+    process.exitCode = 1;
+  }
 }
 
 // Now exercise the self-check itself (loads the reference wav and compares).

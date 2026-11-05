@@ -34,6 +34,8 @@ const els = {
   verdict: document.getElementById("verdict"),
   consistency: document.getElementById("consistency"),
   detail: document.getElementById("detail"),
+  waveform: document.getElementById("waveform"),
+  waveformNote: document.getElementById("waveform-note"),
   samples: document.getElementById("samples"),
   samplesNote: document.getElementById("samples-note"),
   samplesResult: document.getElementById("samples-result"),
@@ -161,6 +163,102 @@ function renderConsistency(rows) {
   }
 }
 
+/**
+ * Draw the 2,000 samples the model is about to see.
+ *
+ * This is a display, not an analysis: the markers are local maxima of the
+ * pre-processed signal, drawn so a viewer can see that the input really is a
+ * heart sound. They are NOT an S1/S2 detection, and nothing downstream depends
+ * on them.
+ */
+function drawWaveform(samples) {
+  const canvas = els.waveform;
+  if (!canvas || typeof canvas.getContext !== "function") return;   // DOM shim / no canvas
+
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth || canvas.width;
+  const cssHeight = canvas.clientHeight || canvas.height;
+  canvas.width = Math.round(cssWidth * dpr);
+  canvas.height = Math.round(cssHeight * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+  const pad = 6;
+  const mid = cssHeight / 2;
+  const amp = (cssHeight - 2 * pad) / 2;
+
+  // zero line
+  ctx.strokeStyle = "rgba(128,128,128,0.45)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, mid);
+  ctx.lineTo(cssWidth, mid);
+  ctx.stroke();
+
+  // waveform: one x pixel per column, take the extreme value in that column so
+  // a 2,000-point signal still shows its peaks on a narrow screen
+  ctx.strokeStyle = "#0a7d32";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const columns = Math.max(2, Math.floor(cssWidth));
+  for (let column = 0; column < columns; column += 1) {
+    const start = Math.floor((column / columns) * samples.length);
+    const end = Math.max(start + 1, Math.floor(((column + 1) / columns) * samples.length));
+    let extreme = samples[start];
+    for (let i = start + 1; i < end; i += 1) {
+      if (Math.abs(samples[i]) > Math.abs(extreme)) extreme = samples[i];
+    }
+    const x = (column / (columns - 1)) * cssWidth;
+    const y = mid - extreme * amp;
+    if (column === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Peak markers, found on a 25 ms RMS envelope rather than on the raw signal:
+  // a heart sound oscillates many times per beat, so raw local maxima would put
+  // dozens of dots inside one S1. Envelope peaks with a 250 ms refractory period
+  // land roughly one per sound (S1 and S2 are ~300 ms apart), which is what a
+  // viewer expects to see. Still display-only -- no S1/S2 labelling.
+  const envWindow = 25;              // 25 ms at 1 kHz
+  const envelope = new Float64Array(samples.length);
+  let running = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    running += samples[i] * samples[i];
+    if (i >= envWindow) running -= samples[i - envWindow] * samples[i - envWindow];
+    envelope[i] = Math.sqrt(running / Math.min(i + 1, envWindow));
+  }
+  let envelopePeak = 0;
+  for (let i = 0; i < envelope.length; i += 1) envelopePeak = Math.max(envelopePeak, envelope[i]);
+  const threshold = envelopePeak * 0.5;
+  const refractory = 250;            // 250 ms -> at most 240 beats/min
+  const markers = [];
+  for (let i = 1; i < envelope.length - 1; i += 1) {
+    if (envelope[i] < threshold) continue;
+    if (envelope[i] < envelope[i - 1] || envelope[i] < envelope[i + 1]) continue;
+    if (markers.length && i - markers[markers.length - 1] < refractory) {
+      if (envelope[i] > envelope[markers[markers.length - 1]]) markers[markers.length - 1] = i;
+      continue;
+    }
+    markers.push(i);
+  }
+  ctx.fillStyle = "rgba(179,38,30,0.85)";
+  for (const index of markers) {
+    const x = (index / (samples.length - 1)) * cssWidth;
+    const y = mid - samples[index] * amp;
+    ctx.beginPath();
+    ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (els.waveformNote) {
+    els.waveformNote.textContent =
+      `2,000 点 @1 kHz = 2 秒，幅度 [-1, 1]。红点是 25 ms 能量包络上的显著峰` +
+      `（仅用于观察，不是 S1/S2 判定）。共 ${markers.length} 个。`;
+  }
+}
+
 async function classifyArrayBuffer(buffer, label) {
   const wav = parseWav(buffer);
   if (wav.sampleRate !== 8000) {
@@ -172,6 +270,7 @@ async function classifyArrayBuffer(buffer, label) {
   const { input, stats } = preprocess(wav.samples);
   const preMs = performance.now() - startedPre;
   lastInput = input;
+  drawWaveform(input);
   const started = performance.now();
   const probabilities = predict(input);
   const inferMs = performance.now() - started;
@@ -233,6 +332,7 @@ async function classifySample(item) {
       throw new Error(`样音是 ${wav.sampleRate} Hz，应为 8 kHz`);
     }
     const { input } = preprocess(wav.samples);
+    drawWaveform(input);
     const probabilities = predict(input);
     renderProbabilities(probabilities);
     const predicted = CLASS_ORDER[argmax(probabilities)];
