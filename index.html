@@ -55,14 +55,19 @@
   <div class="row" id="samples"></div>
   <p class="muted" id="samples-result"></p>
 
-  <h2>2 · 五类概率</h2>
+  <h2>2 · 波形（模型实际看到的输入）</h2>
+  <canvas id="waveform" width="640" height="180"
+          style="width:100%;height:180px;border-radius:.4rem;background:#8881"></canvas>
+  <p class="muted" id="waveform-note">判读后会显示这段 2 秒（2,000 点 @1 kHz）的波形。</p>
+
+  <h2>3 · 五类概率</h2>
   <table>
     <thead><tr><th>类别</th><th class="num">概率</th><th style="width:55%"></th></tr></thead>
     <tbody id="probs"></tbody>
   </table>
   <p id="verdict" class="verdict"></p>
 
-  <h2>3 · 与 Python（Keras）的一致性</h2>
+  <h2>4 · 与 Python（Keras）的一致性</h2>
   <table>
     <thead><tr><th>检查</th><th class="num">最大绝对差</th><th class="num">判据</th><th>结果</th></tr></thead>
     <tbody id="consistency"></tbody>
