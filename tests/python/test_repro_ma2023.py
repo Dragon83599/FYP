@@ -25,6 +25,7 @@ from repro_ma2023 import (  # noqa: E402
     crop_or_pad,
     inner_val_mask,
     macro_f1,
+    pooled_metrics,
     min_max_scale,
     parameter_breakdown,
     stratified_folds,
@@ -125,6 +126,48 @@ class FoldTest(unittest.TestCase):
         for label in range(len(CLASSES)):
             share = mask[self.y == label].mean()
             self.assertAlmostEqual(float(share), 0.10, places=2)
+
+
+class PooledMetricTest(unittest.TestCase):
+    """The F1 everyone quotes must be the pooled one, not an average of folds."""
+
+    class Clip:
+        def __init__(self, label_index):
+            self.label_index = label_index
+
+    def test_perfect_folds_give_f1_100(self):
+        clips = [self.Clip(i // 2) for i in range(10)]
+        folds = [
+            {"test_index": [0, 1, 2, 3, 4], "test_pred": [0, 0, 1, 1, 2]},
+            {"test_index": [5, 6, 7, 8, 9], "test_pred": [2, 3, 3, 4, 4]},
+        ]
+        metrics = pooled_metrics(folds, clips, 5)
+        self.assertAlmostEqual(metrics["macro_f1_pct"], 100.0, places=6)
+        self.assertAlmostEqual(metrics["accuracy_pct"], 100.0, places=6)
+
+    def test_pooling_is_not_the_mean_of_fold_f1(self):
+        # Fold A gets one class badly wrong, fold B gets another class badly
+        # wrong. Averaging fold-level macro F1 would give a different number
+        # than pooling, and pooling is the one we report.
+        clips = [self.Clip(i % 5) for i in range(10)]
+        folds = [
+            # fold A: three of five right; the two errors swap classes 0 and 1
+            {"test_index": [0, 1, 2, 3, 4], "test_pred": [1, 0, 2, 3, 4]},
+            # fold B: four of five right; one class-1 clip predicted as class 2
+            {"test_index": [5, 6, 7, 8, 9], "test_pred": [0, 2, 2, 3, 4]},
+        ]
+        pooled = pooled_metrics(folds, clips, 5)
+        self.assertAlmostEqual(pooled["accuracy_pct"], 70.0, places=6)
+        self.assertGreater(pooled["macro_f1_pct"], 0.0)
+        self.assertLess(pooled["macro_f1_pct"], 100.0)
+        # support is 2 per class, so the confusion matrix must sum to 10
+        self.assertEqual(pooled["n_clips"], 10)
+
+    def test_per_class_keys_follow_the_frozen_order(self):
+        clips = [self.Clip(i) for i in range(5)]
+        folds = [{"test_index": [0, 1, 2, 3, 4], "test_pred": [0, 1, 2, 3, 4]}]
+        metrics = pooled_metrics(folds, clips, 5)
+        self.assertEqual(list(metrics["per_class_f1_pct"]), list(CLASSES))
 
 
 class MetricTest(unittest.TestCase):

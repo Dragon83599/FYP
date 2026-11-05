@@ -354,6 +354,39 @@ def macro_f1(cm: np.ndarray) -> float:
     return float(np.mean(f1s))
 
 
+def pooled_metrics(folds: list[dict], clips: list, k: int) -> dict:
+    """Sum the out-of-fold confusion matrices, then compute F1 once.
+
+    Macro F1 is the metric that decides whether a model is good (ADR-053). It is
+    computed from the pooled matrix, not by averaging per-fold F1: a fold with
+    few positives for a class would otherwise carry the same weight as a fold
+    with many, and the number would drift with the fold split.
+    """
+    cm = np.zeros((k, k), dtype=np.int64)
+    for fold in folds:
+        for position, prediction in zip(fold["test_index"], fold["test_pred"]):
+            cm[clips[position].label_index, prediction] += 1
+    total = int(cm.sum())
+    f1s = []
+    per_class = {}
+    for i, name in enumerate(CLASSES):
+        tp = int(cm[i, i])
+        fp = int(cm[:, i].sum()) - tp
+        fn = int(cm[i, :].sum()) - tp
+        denom = 2 * tp + fp + fn
+        f1 = 2 * tp / denom if denom else 0.0
+        per_class[name] = round(f1 * 100, 2)
+        f1s.append(f1)
+    return {
+        "n_clips": total,
+        "accuracy_pct": round(float(np.trace(cm) / total) * 100, 2) if total else None,
+        "macro_f1_pct": round(float(np.mean(f1s)) * 100, 2) if total else None,
+        "per_class_f1_pct": per_class,
+        "confusion": cm.tolist(),
+        "class_order": list(CLASSES),
+    }
+
+
 def t_ci95(values: np.ndarray) -> tuple[float, float]:
     """Student-t 95 % CI of the mean.
 
@@ -532,6 +565,7 @@ def main(argv: list[str] | None = None) -> int:
     fold_of = stratified_folds(y, args.folds, args.seed)
     all_folds: list[dict] = []
     attempt_means: list[float] = []
+    pooled_by_attempt: list[dict] = []
 
     for repeat in range(0 if args.final_only else args.repeats):
         seed = args.seed + repeat * 1000
@@ -553,6 +587,12 @@ def main(argv: list[str] | None = None) -> int:
             )
         attempt_mean = float(np.mean(fold_accs)) * 100.0
         attempt_means.append(attempt_mean)
+        attempt_pooled = pooled_metrics(
+            [f for f in all_folds if f["repeat"] == repeat], clips, len(CLASSES)
+        )
+        print(f"[repeat {repeat}] pooled macro F1 = {attempt_pooled['macro_f1_pct']:.2f}%  "
+              + "  ".join(f"{c} {v:.2f}" for c, v in attempt_pooled["per_class_f1_pct"].items()))
+        pooled_by_attempt.append(attempt_pooled)
         print(f"[repeat {repeat}] 10-fold mean accuracy = {attempt_mean:.3f}%  ({(time.time()-started)/60:.1f} min)")
 
     if args.final_only:
@@ -622,6 +662,11 @@ def main(argv: list[str] | None = None) -> int:
             "fold_accuracy_ci95_pct": [round(x, 4) for x in fold_ci],
             "attempt_mean_accuracy_pct": [round(a, 4) for a in attempt_means],
             "attempt_mean_ci95_pct": [round(x, 4) for x in attempt_ci],
+            # Macro F1 is the headline (ADR-053); accuracy is only comparable
+            # with the paper, which reports accuracy and nothing else.
+            "macro_f1_pooled_pct": pooled_by_attempt[0]["macro_f1_pct"] if pooled_by_attempt else None,
+            "per_class_f1_pooled_pct": pooled_by_attempt[0]["per_class_f1_pct"] if pooled_by_attempt else None,
+            "pooled_by_attempt": pooled_by_attempt,
             "macro_f1_mean_pct": round(float(np.mean([f["macro_f1"] for f in all_folds]) * 100), 4) if has_folds else None,
             "delta_vs_paper_pct": round(mean_acc - PAPER_ACC, 4) if has_folds else None,
             "within_acceptance_band": bool(abs(mean_acc - PAPER_ACC) <= 1.5) if has_folds else None,
@@ -660,9 +705,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"final model -> {args.save_final_model}")
 
     if not args.final_only:
+        f1s = [a["macro_f1_pct"] for a in pooled_by_attempt if a["macro_f1_pct"] is not None]
+        mean_f1 = float(np.mean(f1s)) if f1s else float("nan")
         print(
-            f"\nmean 10-fold accuracy = {all_acc.mean():.3f}% "
-            f"(fold CI95 {fold_ci[0]:.3f}-{fold_ci[1]:.3f}), "
+            f"\nmacro F1 (pooled, main metric) = {mean_f1:.3f}%   "
+            f"[accuracy {all_acc.mean():.3f}% — only comparable with the paper]"
+        )
+        print(
+            f"fold CI95 of accuracy {fold_ci[0]:.3f}-{fold_ci[1]:.3f}, "
             f"delta vs paper = {all_acc.mean() - PAPER_ACC:+.3f} pt, "
             f"acceptance {'PASS' if abs(all_acc.mean() - PAPER_ACC) <= 1.5 else 'FAIL'}"
         )
