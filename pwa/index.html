@@ -50,6 +50,15 @@
   <p class="muted" id="pwa-state">检查离线能力…</p>
   <button id="install" type="button" style="display:none" disabled>安装到桌面</button>
 
+  <h2>1b · 实时采集（BLE 探头）</h2>
+  <div class="row">
+    <button id="ble-connect" type="button">连接探头</button>
+    <button id="ble-start" type="button" disabled>开始采集</button>
+    <button id="ble-stop" type="button" disabled>停止</button>
+  </div>
+  <p class="muted" id="ble-state">未连接。需要安卓 Chrome / Edge（Web Bluetooth 只在它们上面可用）。</p>
+  <p class="muted" id="ble-stats"></p>
+
   <h2>2a · 用现成样音试一下（不用传文件）</h2>
   <p class="muted" id="samples-note">加载样音列表…</p>
   <div class="row" id="samples"></div>

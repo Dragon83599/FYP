@@ -23,12 +23,19 @@ class StubElement {
     this.id = id;
     this.children = [];
     this.textContent = "";
-    this.innerHTML = "";
+    this._innerHTML = "";
     this.disabled = false;
     this.style = {};
     this.listeners = {};
     this.value = "";
     this.files = [];
+  }
+  // In a browser, assigning innerHTML = "" drops the children; mirror that so a
+  // re-render does not look like it appended a second table.
+  get innerHTML() { return this._innerHTML; }
+  set innerHTML(value) {
+    this._innerHTML = value;
+    if (value === "") this.children = [];
   }
   addEventListener(type, handler) { this.listeners[type] = handler; }
   appendChild(child) { this.children.push(child); return child; }
@@ -108,6 +115,73 @@ globalThis.fetch = async (url) => {
     json: async () => JSON.parse(buffer.toString("utf8")),
   };
 };
+
+// A fake Web Bluetooth, installed before app.js loads so the page takes the
+// "supported" branch and the live path can be exercised.
+const { encodeAudioToLinkPackets } = await import(
+  "../../audio-sim/lib/pipeline.mjs"
+);
+const { LKA1_AUDIO_DATA_UUID, LKA1_CONTROL_UUID, LKA1_STATUS_UUID, LKA1_SERVICE_UUID } =
+  await import("../../../pwa/gatt.js");
+
+class FakeTarget {
+  constructor() { this.listeners = new Map(); }
+  addEventListener(type, handler) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(handler);
+  }
+  dispatch(type, event) { for (const h of this.listeners.get(type) ?? []) h(event); }
+}
+
+class FakeChar extends FakeTarget {
+  constructor(uuid, writable = false) {
+    super();
+    this.uuid = uuid;
+    this.value = null;
+    this.properties = writable ? { write: true } : {};
+    this.writes = [];
+  }
+  async startNotifications() { return this; }
+  async writeValueWithResponse(bytes) { this.writes.push(Uint8Array.from(bytes)); }
+  notify(bytes) {
+    const copy = new Uint8Array(bytes);
+    this.value = new DataView(copy.buffer, copy.byteOffset, copy.byteLength);
+    this.dispatch("characteristicvaluechanged", { target: this });
+  }
+}
+
+const fakeChars = {
+  audio: new FakeChar(LKA1_AUDIO_DATA_UUID),
+  control: new FakeChar(LKA1_CONTROL_UUID, true),
+  status: new FakeChar(LKA1_STATUS_UUID),
+};
+const fakeDevice = new FakeTarget();
+fakeDevice.name = "probe-sim";
+fakeDevice.gatt = {
+  connected: false,
+  async connect() {
+    this.connected = true;
+    return {
+      async getPrimaryService() {
+        return {
+          async getCharacteristic(uuid) {
+            if (uuid === LKA1_AUDIO_DATA_UUID) return fakeChars.audio;
+            if (uuid === LKA1_CONTROL_UUID) return fakeChars.control;
+            if (uuid === LKA1_STATUS_UUID) return fakeChars.status;
+            throw new Error(`unexpected ${uuid}`);
+          },
+        };
+      },
+    };
+  },
+  disconnect() { this.connected = false; fakeDevice.dispatch("gattserverdisconnected", {}); },
+};
+const fakeBluetooth = { async requestDevice() { return fakeDevice; } };
+Object.defineProperty(globalThis, "navigator", {
+  value: { bluetooth: fakeBluetooth, userAgent: "Node.js/24" },
+  configurable: true,
+  writable: true,
+});
 
 const tf = await import("@tensorflow/tfjs");
 await tf.setBackend("cpu");
@@ -195,6 +269,54 @@ if (!/一致性自检通过/.test(finalStatus)) {
 if (rows !== 2) {
   console.error(`expected 2 consistency rows, got ${rows}`);
   process.exitCode = 1;
+}
+
+// Live capture: connect to the fake probe, start, push two seconds of audio and
+// require the page to classify it and to report link statistics.
+const bleConnect = elements.get("ble-connect");
+const bleStart = elements.get("ble-start");
+if (!bleConnect?.listeners?.click || !bleStart?.listeners?.click) {
+  console.error("the live-capture buttons are not wired");
+  process.exitCode = 1;
+} else {
+  bleConnect.disabled = false;
+  await bleConnect.fire("click");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  if (!fakeChars.audio.listeners.has("characteristicvaluechanged")) {
+    console.error("audio notifications were not subscribed");
+    process.exitCode = 1;
+  }
+  await bleStart.fire("click");
+
+  // 2 s of 8 kHz audio = 100 frames of 160 samples
+  const samples = new Int16Array(16000);
+  for (let i = 0; i < samples.length; i += 1) {
+    samples[i] = Math.round(8000 * Math.sin((2 * Math.PI * 60 * i) / 8000));
+  }
+  const { packets } = encodeAudioToLinkPackets(samples, { sessionId: 3, maxFragmentPayload: 222 });
+  for (const packet of packets) fakeChars.audio.notify(packet);
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  const stats = elements.get("ble-stats")?.textContent ?? "";
+  const probRows = elements.get("probs")?.children.length ?? 0;
+  console.log(JSON.stringify({
+    ble_state: elements.get("ble-state")?.textContent ?? "",
+    ble_stats: stats,
+    probability_rows: probRows,
+    control_writes: fakeChars.control.writes.map((w) => Array.from(w)),
+  }, null, 2));
+  if (!/帧 100/.test(stats)) {
+    console.error(`expected 100 frames in the stats line, got: ${stats}`);
+    process.exitCode = 1;
+  }
+  if (probRows !== 5) {
+    console.error(`expected five probability rows after live capture, got ${probRows}`);
+    process.exitCode = 1;
+  }
+  if (fakeChars.control.writes.length !== 1 || fakeChars.control.writes[0][0] !== 1) {
+    console.error("START was not written exactly once");
+    process.exitCode = 1;
+  }
 }
 
 // Diagnostic: it must run even when app.js is broken, so exercise it directly.
