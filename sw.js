@@ -17,7 +17,7 @@
  * the list covers every file the page fetches).
  */
 
-const CACHE_VERSION = "pcg-demo-v3";
+const CACHE_VERSION = "pcg-demo-v4";
 const CACHE = `pcg-demo-${CACHE_VERSION}`;
 
 // Everything the page asks for. Missing one entry means that file silently
@@ -30,6 +30,9 @@ const PRECACHE = [
   "./pwa.js",
   "./preprocess.js",
   "./wav.js",
+  "./lka1.js",
+  "./gatt.js",
+  "./bluetooth.js",
   "./filters/resample-poly.js",
   "./manifest.json",
   "./vendor/tf.min.js",

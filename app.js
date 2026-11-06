@@ -13,6 +13,7 @@
 
 import { CLASS_ORDER, argmax, preprocess } from "./preprocess.js";
 import { parseWav } from "./wav.js";
+import { ProbeConnection } from "./bluetooth.js";
 
 const TOLERANCE = 1e-3;          // W2 acceptance criterion
 const LABEL_ZH = {
@@ -36,6 +37,11 @@ const els = {
   detail: document.getElementById("detail"),
   waveform: document.getElementById("waveform"),
   waveformNote: document.getElementById("waveform-note"),
+  bleConnect: document.getElementById("ble-connect"),
+  bleStart: document.getElementById("ble-start"),
+  bleStop: document.getElementById("ble-stop"),
+  bleState: document.getElementById("ble-state"),
+  bleStats: document.getElementById("ble-stats"),
   samples: document.getElementById("samples"),
   samplesNote: document.getElementById("samples-note"),
   samplesResult: document.getElementById("samples-result"),
@@ -43,6 +49,14 @@ const els = {
 };
 
 let model = null;
+// --- live capture (BLE) -----------------------------------------------------
+// Two seconds at 8 kHz is what the model's pre-processing expects; the buffer
+// keeps the most recent window and classifies whenever it is full.
+const LIVE_WINDOW_SAMPLES = 16000;
+let probe = null;
+let liveBuffer = [];
+let liveFrames = 0;
+let liveLastClassify = 0;
 // Tally for the one-tap sample buttons: how many of the labelled clips the model
 // got right in this session.
 const tally = { total: 0, correct: 0 };
@@ -171,7 +185,7 @@ function renderConsistency(rows) {
  * heart sound. They are NOT an S1/S2 detection, and nothing downstream depends
  * on them.
  */
-function drawWaveform(samples) {
+function drawWaveform(samples, label = "2,000 点 @1 kHz = 2 秒") {
   const canvas = els.waveform;
   if (!canvas || typeof canvas.getContext !== "function") return;   // DOM shim / no canvas
 
@@ -254,7 +268,7 @@ function drawWaveform(samples) {
 
   if (els.waveformNote) {
     els.waveformNote.textContent =
-      `2,000 点 @1 kHz = 2 秒，幅度 [-1, 1]。红点是 25 ms 能量包络上的显著峰` +
+      `${label}，幅度 [-1, 1]。红点是 25 ms 能量包络上的显著峰` +
       `（仅用于观察，不是 S1/S2 判定）。共 ${markers.length} 个。`;
   }
 }
@@ -293,6 +307,112 @@ async function onFile(event) {
   } catch (error) {
     setStatus(String(error.message ?? error), true);
   }
+}
+
+/**
+ * Connect to the probe and stream.
+ *
+ * The click is required: Web Bluetooth only opens the chooser from a user
+ * gesture. Everything after that is driven by notifications.
+ */
+async function connectProbe() {
+  try {
+    els.bleConnect.disabled = true;
+    els.bleState.style.color = "";
+    els.bleState.textContent = "正在请求蓝牙设备…";
+    probe = new ProbeConnection({
+      onFrame: onLiveFrame,
+      onStatus: (status) => {
+        els.bleStats.dataset.state = status.stateName;
+        els.bleStats.dataset.error = status.errorName;
+        renderLiveStats();
+      },
+      onState: (state, detail) => {
+        if (state === "connected") {
+          els.bleState.textContent = `已连接${detail ? `：${detail}` : ""}。点"开始采集"让探头开始发数据。`;
+          els.bleStart.disabled = false;
+          els.bleStop.disabled = false;
+        } else if (state === "disconnected") {
+          els.bleState.textContent = "探头已断开，可重新连接。";
+          els.bleStart.disabled = true;
+          els.bleStop.disabled = true;
+          probe = null;
+          els.bleConnect.disabled = false;
+        } else {
+          els.bleState.textContent = `状态：${state}`;
+        }
+      },
+      onError: (error, stats) => {
+        els.bleState.style.color = "var(--bad)";
+        els.bleState.textContent = `链路错误（${error.code ?? "unknown"}）：${error.message}`;
+        renderLiveStats(stats);
+      },
+    });
+    await probe.connect();
+  } catch (error) {
+    els.bleState.style.color = "var(--bad)";
+    els.bleState.textContent = `连接失败：${error.message ?? error}`;
+    els.bleConnect.disabled = false;
+  }
+}
+
+async function startLive() {
+  if (!probe) return;
+  liveBuffer = [];
+  liveFrames = 0;
+  try {
+    await probe.start();
+    els.bleState.style.color = "";
+    els.bleState.textContent = "采集中：每攒满 2 秒判读一次。";
+    renderLiveStats();
+  } catch (error) {
+    els.bleState.style.color = "var(--bad)";
+    els.bleState.textContent = `启动采集失败：${error.message ?? error}`;
+  }
+}
+
+async function stopLive() {
+  if (!probe) return;
+  try {
+    await probe.stop();
+  } finally {
+    els.bleState.textContent = "已停止采集。";
+  }
+}
+
+/** Every 20 ms frame: append to the window and classify when it is full. */
+function onLiveFrame(frame, stats) {
+  liveFrames += 1;
+  for (let i = 0; i < frame.normalized.length; i += 1) liveBuffer.push(frame.normalized[i]);
+  if (liveBuffer.length > LIVE_WINDOW_SAMPLES) {
+    liveBuffer = liveBuffer.slice(liveBuffer.length - LIVE_WINDOW_SAMPLES);
+  }
+  renderLiveStats(stats);
+  if (liveBuffer.length >= LIVE_WINDOW_SAMPLES) {
+    const now = performance.now();
+    if (now - liveLastClassify > 500) {   // at most twice a second
+      liveLastClassify = now;
+      const window = Float64Array.from(liveBuffer.slice(-LIVE_WINDOW_SAMPLES));
+      const { input } = preprocess(window);
+      drawWaveform(input, "实时 2 秒窗");
+      renderProbabilities(predict(input));
+      liveBuffer = liveBuffer.slice(-LIVE_WINDOW_SAMPLES / 2);   // 50% overlap
+    }
+  }
+}
+
+function renderLiveStats(stats = probe?.stats) {
+  if (!els.bleStats) return;
+  if (!stats) {
+    els.bleStats.textContent = "";
+    return;
+  }
+  const seconds = stats.frames / 50;
+  const fps = seconds > 0 ? stats.frames / seconds : 0;
+  els.bleStats.textContent =
+    `帧 ${stats.frames}｜包 ${stats.packets}｜CRC 错 ${stats.crcErrors}｜` +
+    `分片错 ${stats.fragmentErrors}｜序号丢帧 ${stats.droppedBySequence}｜` +
+    `本页收帧 ${liveFrames}`;
 }
 
 /**
@@ -503,6 +623,16 @@ async function main() {
   els.file.addEventListener("change", onFile);
   els.selfCheck.addEventListener("click", runSelfCheck);
   els.benchmark.addEventListener("click", runBenchmark);
+  els.bleConnect.addEventListener("click", connectProbe);
+  els.bleStart.addEventListener("click", startLive);
+  els.bleStop.addEventListener("click", stopLive);
+  if (!("bluetooth" in navigator)) {
+    els.bleState.style.color = "var(--bad)";
+    els.bleState.textContent =
+      "这个浏览器没有 Web Bluetooth，实时采集不可用（需要安卓 Chrome / Edge）。" +
+      "文件导入与样音试听不受影响。";
+    els.bleConnect.disabled = true;
+  }
   loadSamples();
   els.copy.addEventListener("click", copyResult);
 }
