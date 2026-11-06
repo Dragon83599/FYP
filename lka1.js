@@ -320,6 +320,50 @@ function bytesEqual(a, b) {
 }
 
 /**
+ * Decode a complete 352-byte AUD1 frame into samples plus its metadata.
+ *
+ * The phone needs more than the PCM: the probe's `sequence` detects dropped
+ * frames and `timestamp_ms` drives the display clock (see the profile's §8).
+ * Both are read here, and the frame CRC is verified before the samples are
+ * handed on -- a frame that fails this check must never reach the model.
+ */
+export function decodeAudioFrame(frame) {
+  requireBytes(frame, "frame");
+  if (frame.length !== AUDIO_WIRE_FRAME_BYTES) {
+    throw new LinkAProtocolError(
+      "bad_frame",
+      `frame must be ${AUDIO_WIRE_FRAME_BYTES} bytes, got ${frame.length}`,
+    );
+  }
+  const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
+  if (view.getUint32(0, true) !== 0x31445541) {
+    throw new LinkAProtocolError("bad_magic", "AUD1 magic is invalid");
+  }
+  const expectedCrc = view.getUint16(AUDIO_WIRE_FRAME_BYTES - 2, true);
+  const actualCrc = crc16CcittFalse(frame, 0, AUDIO_WIRE_FRAME_BYTES - 2);
+  if (expectedCrc !== actualCrc) {
+    throw new LinkAProtocolError("bad_crc", "AUD1 frame CRC is invalid");
+  }
+  const sampleCount = view.getUint32(16, true);
+  const samples = new Int16Array(sampleCount);
+  for (let i = 0; i < sampleCount; i += 1) {
+    samples[i] = view.getInt16(30 + i * 2, true);
+  }
+  const normalized = new Float64Array(sampleCount);
+  for (let i = 0; i < sampleCount; i += 1) {
+    normalized[i] = samples[i] / 32768;
+  }
+  return {
+    sequence: view.getUint32(20, true),
+    timestampMs: view.getUint32(24, true),
+    sampleRateHz: view.getUint32(12, true),
+    sampleCount,
+    samples,
+    normalized,
+  };
+}
+
+/**
  * Pull the 320 PCM bytes out of a 352-byte AUD1 frame (header at 30, CRC at 350).
  *
  * Kept here rather than in the page so the same offsets are used by the replay
