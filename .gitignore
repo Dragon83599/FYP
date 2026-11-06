@@ -24,6 +24,7 @@ node_modules/
 # ESP-IDF firmware artifacts (firmware/ is a separate ESP-IDF project)
 firmware/build/
 firmware/sdkconfig
+firmware/probe-sim/sdkconfig
 firmware/managed_components/
 firmware/sdkconfig.old
 

@@ -50,9 +50,22 @@ if(BUILD_TESTING)
         target_link_libraries(test_host_pipeline PRIVATE m)
     endif()
 
+    # The probe simulator's encoder is plain C, so its golden vectors can be
+    # checked on the host before any board exists.
+    add_executable(test_lka1_vectors
+        tests/c/lka1_vectors.c
+        firmware/probe-sim/main/lka1_encode.c
+    )
+    if(MSVC)
+        target_compile_options(test_lka1_vectors PRIVATE /W4)
+    else()
+        target_compile_options(test_lka1_vectors PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+
     add_test(NAME audio_protocol COMMAND test_audio_protocol)
     add_test(NAME link_a_protocol COMMAND test_link_a_protocol)
     add_test(NAME host_pipeline COMMAND test_host_pipeline)
+    add_test(NAME lka1_vectors COMMAND test_lka1_vectors)
 
     add_executable(test_hr_detector
         tests/test_hr_detector.c
