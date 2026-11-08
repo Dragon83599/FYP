@@ -95,6 +95,33 @@ ctest --test-dir build -R lka1_vectors --output-on-failure
 | 实测：MTU、2M PHY 是否真开、丢帧率、P95 延迟 | ⬜ 等板子到货 |
 | Wi-Fi 共存（如果探头同时要用 Wi-Fi）| ⬜ 不在本模拟器范围 |
 
+## 6.1 实测记录（2026-11-08）
+
+ESP32-S3-DevKitC-1，手机端安卓 Edge，真实 BLE 无线电：
+
+| 项 | 值 |
+| --- | --- |
+| ATT MTU | **247** |
+| PHY | **2M（tx=2 rx=2）** |
+| 连接间隔 | **7.50 ms**（协商结果；请求的是 15 ms）|
+| 连续运行 | **16,000 帧 / 32,000 包 / 320 秒** |
+| 丢帧 | **0** |
+| notify 失败 | **0** |
+| 手机端 CRC 错 / 分片错 / 序号丢帧 | **0 / 0 / 0** |
+
+详细清单见 `docs/link-a-gatt-profile.md` §9.1。
+
+## 6.2 上手时踩过的三个坑（都花了时间，记下来）
+
+| # | 现象 | 真因 | 修法 |
+| --- | --- | --- | --- |
+| 1 | 烧完一启动就 `abort()` | NimBLE 的 `ble_gatts_count_cfg` 返回 `BLE_HS_EINVAL`：**每个特征都必须有 `access_cb`**，即使是只做 Notify 的 | 给 Audio / Status 都加回调 |
+| 2 | 手机蓝牙列表里**看不到设备名** | 128-bit 服务 UUID（18 B）+ flags（3 B）已经把 31 B 的广播包占满，放不下名字 | 名字放进 **Scan Response**（`ble_gap_adv_rsp_set_fields`）|
+| 3 | **START 收到了，但一帧都不发** | `ble_gap_adv_start(..., NULL, NULL)` —— **GAP 事件回调没注册**，连接句柄永远是 `NONE`，发送循环每次直接 return | 传 `gap_event`；并在写入回调里兜底补上句柄 |
+
+第 3 个最隐蔽：写入走 GATT，不依赖那个回调，所以 START 照常打印，看起来"命令收到了"。
+是加了 `mtu=0` 这一行诊断才定位到的——**"命令收到"不等于"链路建立"**。
+
 ## 7. 已知的简化（写论文时要说明）
 
 - **无麦克风**：音频来自 flash 里的固定录音，所以"采集质量"这一环没有被验证。

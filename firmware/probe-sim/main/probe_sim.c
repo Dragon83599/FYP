@@ -69,6 +69,7 @@ static uint32_t frame_sequence;
 static uint32_t frames_sent;
 static uint32_t packets_sent;
 static uint32_t dropped_frames;
+static uint32_t notify_failures;
 
 static const int16_t *pcm;         /* start of the PCM inside the embedded wav */
 static size_t pcm_samples;
@@ -127,7 +128,16 @@ static void send_status(void)
     }
 }
 
-/** Send one AUD1 frame as two LKA1 packets (222 + 130 bytes of PCM). */
+/**
+ * Send one AUD1 frame as however many LKA1 packets the current MTU allows.
+ *
+ * The profile assumes MTU 247, i.e. two packets of 222 + 130 bytes. But Web
+ * Bluetooth cannot request an MTU, so the actual value is whatever Android
+ * negotiated -- and with the default 23 the 22-byte LKA1 header would not even
+ * fit, which fails silently. Fragmenting against `ble_att_mtu()` turns that into
+ * "more, smaller packets" instead of "no packets at all", and the first failure
+ * is logged so it cannot be silent again.
+ */
 static void send_frame(const int16_t *samples)
 {
     uint8_t frame[AUD1_FRAME_BYTES];
@@ -137,27 +147,57 @@ static void send_frame(const int16_t *samples)
         return;
     }
 
+    const uint16_t mtu = ble_att_mtu(conn_handle);
+    const size_t max_notify = mtu > 3 ? (size_t)(mtu - 3) : 20;
+    if (max_notify <= LKA1_HEADER_BYTES + LKA1_CRC_BYTES) {
+        if (notify_failures == 0) {
+            ESP_LOGE(TAG, "MTU %u leaves %u bytes per notification, LKA1 needs %u",
+                     mtu, (unsigned)max_notify, LKA1_HEADER_BYTES + LKA1_CRC_BYTES);
+        }
+        notify_failures++;
+        dropped_frames++;
+        return;
+    }
+    size_t fragment_payload = max_notify - (LKA1_HEADER_BYTES + LKA1_CRC_BYTES);
+    if (fragment_payload > LKA1_MAX_FRAGMENT) {
+        fragment_payload = LKA1_MAX_FRAGMENT;
+    }
+    const size_t count = (AUD1_FRAME_BYTES + fragment_payload - 1) / fragment_payload;
+    if (count > 255) {
+        if (notify_failures == 0) {
+            ESP_LOGE(TAG, "MTU %u needs %u fragments per frame, protocol allows 255",
+                     mtu, (unsigned)count);
+        }
+        notify_failures++;
+        dropped_frames++;
+        return;
+    }
+
     uint8_t packet[LKA1_MAX_PACKET_BYTES];
-    size_t first = 222;
-    size_t remaining = AUD1_FRAME_BYTES - first;
-
-    size_t length = lka1_encode_packet(packet, sizeof(packet), LKA1_TYPE_DATA,
-                                       LKA1_FLAG_START, session_id, frame_sequence,
-                                       0, 2, 0, frame, (uint16_t)first);
-    if (length == 0 || notify(audio_handle, packet, length) != 0) {
-        dropped_frames++;
-        return;
+    for (size_t index = 0; index < count; index++) {
+        const size_t offset = index * fragment_payload;
+        size_t length = AUD1_FRAME_BYTES - offset;
+        if (length > fragment_payload) {
+            length = fragment_payload;
+        }
+        const uint8_t flags = (uint8_t)((index == 0 ? LKA1_FLAG_START : 0) |
+                                        (index + 1 == count ? LKA1_FLAG_END : 0));
+        const size_t packet_length = lka1_encode_packet(
+            packet, sizeof(packet), LKA1_TYPE_DATA, flags, session_id, frame_sequence,
+            (uint8_t)index, (uint8_t)count, (uint16_t)offset, frame + offset,
+            (uint16_t)length);
+        const int rc = notify(audio_handle, packet, packet_length);
+        if (rc != 0) {
+            if (notify_failures == 0) {
+                ESP_LOGE(TAG, "notify failed rc=%d (mtu=%u, fragment %u/%u, %u bytes)",
+                         rc, mtu, (unsigned)index + 1, (unsigned)count, (unsigned)length);
+            }
+            notify_failures++;
+            dropped_frames++;
+            return;
+        }
+        packets_sent++;
     }
-    packets_sent++;
-
-    length = lka1_encode_packet(packet, sizeof(packet), LKA1_TYPE_DATA,
-                                LKA1_FLAG_END, session_id, frame_sequence,
-                                1, 2, (uint16_t)first, frame + first, (uint16_t)remaining);
-    if (length == 0 || notify(audio_handle, packet, length) != 0) {
-        dropped_frames++;
-        return;
-    }
-    packets_sent++;
 
     frame_sequence++;
     frames_sent++;
@@ -176,10 +216,10 @@ static void frame_timer_cb(void *arg)
     send_frame(pcm + pcm_cursor);
     pcm_cursor += AUD1_FRAME_SAMPLES;
 
-    if ((frames_sent % 50) == 0) {          /* once per second */
-        ESP_LOGI(TAG, "frames=%lu packets=%lu dropped=%lu",
+    if (frames_sent == 1 || (frames_sent % 50) == 0) {   /* first frame, then once per second */
+        ESP_LOGI(TAG, "frames=%lu packets=%lu dropped=%lu notify_failures=%lu",
                  (unsigned long)frames_sent, (unsigned long)packets_sent,
-                 (unsigned long)dropped_frames);
+                 (unsigned long)dropped_frames, (unsigned long)notify_failures);
         send_status();
     }
 }
@@ -194,6 +234,9 @@ static int control_access(uint16_t conn_handle_in, uint16_t attr_handle,
     (void)arg;
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) {
         return BLE_ATT_ERR_UNLIKELY;
+    }
+    if (conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        conn_handle = conn_handle_in;   /* connect event may not have run yet */
     }
     uint8_t value[8];
     uint16_t length = 0;
@@ -213,7 +256,16 @@ static int control_access(uint16_t conn_handle_in, uint16_t attr_handle,
         dropped_frames = 0;
         pcm_cursor = 0;
         streaming = true;
-        ESP_LOGI(TAG, "START session=%u token=%lu", session_id, (unsigned long)token);
+        {
+            const uint16_t mtu = ble_att_mtu(conn_handle);
+            const size_t per_packet = mtu > 3 ? (size_t)(mtu - 3) : 20;
+            const size_t fragment = per_packet > LKA1_HEADER_BYTES + LKA1_CRC_BYTES
+                                        ? per_packet - (LKA1_HEADER_BYTES + LKA1_CRC_BYTES)
+                                        : 0;
+            ESP_LOGI(TAG, "START session=%u token=%lu mtu=%u fragment=%u bytes/frame=%u",
+                     session_id, (unsigned long)token, mtu, (unsigned)fragment,
+                     fragment ? (unsigned)((AUD1_FRAME_BYTES + fragment - 1) / fragment) : 0);
+        }
         break;
     case LKA1_CMD_STOP:
         streaming = false;
@@ -229,6 +281,43 @@ static int control_access(uint16_t conn_handle_in, uint16_t attr_handle,
     return 0;
 }
 
+/* ---- GATT access callbacks ------------------------------------------------
+ * NimBLE rejects a characteristic whose access_cb is NULL (ble_gatts_count_cfg
+ * returns BLE_HS_EINVAL), even for a notify-only characteristic. These exist to
+ * satisfy that check and to answer a read if a client asks.
+ */
+
+static int audio_access(uint16_t conn_handle_in, uint16_t attr_handle,
+                        struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)conn_handle_in;
+    (void)attr_handle;
+    (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        const uint8_t empty = 0;
+        return os_mbuf_append(ctxt->om, &empty, sizeof(empty));
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+static int status_access(uint16_t conn_handle_in, uint16_t attr_handle,
+                         struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)conn_handle_in;
+    (void)attr_handle;
+    (void)arg;
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        uint8_t value[4] = {
+            streaming ? 1 : 0,
+            0,
+            (uint8_t)(dropped_frames & 0xff),
+            0,
+        };
+        return os_mbuf_append(ctxt->om, value, sizeof(value));
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
 /* ---- GATT table ----------------------------------------------------------- */
 
 static const struct ble_gatt_svc_def gatt_services[] = {
@@ -238,7 +327,7 @@ static const struct ble_gatt_svc_def gatt_services[] = {
         .characteristics = (struct ble_gatt_chr_def[]){
             {
                 .uuid = &audio_uuid.u,
-                .access_cb = NULL,
+                .access_cb = audio_access,
                 .flags = BLE_GATT_CHR_F_NOTIFY,
                 .val_handle = &audio_handle,
             },
@@ -249,7 +338,7 @@ static const struct ble_gatt_svc_def gatt_services[] = {
             },
             {
                 .uuid = &status_uuid.u,
-                .access_cb = NULL,
+                .access_cb = status_access,
                 .flags = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ,
                 .val_handle = &status_handle,
             },
@@ -260,6 +349,24 @@ static const struct ble_gatt_svc_def gatt_services[] = {
 };
 
 /* ---- GAP ------------------------------------------------------------------ */
+
+static int gap_event(struct ble_gap_event *event, void *arg);
+
+/** Log the negotiated interval/latency/timeout of the current connection. */
+static void log_conn_params(const char *when)
+{
+    struct ble_gap_conn_desc desc;
+    if (conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        return;
+    }
+    if (ble_gap_conn_find(conn_handle, &desc) != 0) {
+        ESP_LOGW(TAG, "%s: connection not found", when);
+        return;
+    }
+    ESP_LOGI(TAG, "%s: itvl=%.2f ms latency=%u timeout=%u ms",
+             when, desc.conn_itvl * 1.25, desc.conn_latency,
+             (unsigned)desc.supervision_timeout * 10);
+}
 
 static void advertise(void)
 {
@@ -275,13 +382,26 @@ static void advertise(void)
         return;
     }
 
+    /* The 128-bit service UUID plus the flags already fill most of the 31-byte
+     * advertisement, so the name goes in the scan response -- otherwise the
+     * browser's device chooser shows an entry with no name and it is impossible
+     * to tell the probe from anything else in the room. */
+    struct ble_hs_adv_fields rsp = {0};
+    rsp.name = (const uint8_t *)"probe-sim";
+    rsp.name_len = 9;
+    rsp.name_is_complete = 1;
+    rc = ble_gap_adv_rsp_set_fields(&rsp);
+    if (rc != 0) {
+        ESP_LOGW(TAG, "scan response fields: %d", rc);
+    }
+
     struct ble_gap_adv_params params = {0};
     params.conn_mode = BLE_GAP_CONN_MODE_UND;
     params.disc_mode = BLE_GAP_DISC_MODE_GEN;
     params.itvl_min = BLE_GAP_ADV_ITVL_MS(100);
     params.itvl_max = BLE_GAP_ADV_ITVL_MS(100);
 
-    rc = ble_gap_adv_start(own_addr_type, NULL, BLE_HS_FOREVER, &params, NULL, NULL);
+    rc = ble_gap_adv_start(own_addr_type, NULL, BLE_HS_FOREVER, &params, gap_event, NULL);
     if (rc != 0) {
         ESP_LOGE(TAG, "adv start: %d", rc);
     } else {
@@ -301,9 +421,15 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         }
         conn_handle = event->connect.conn_handle;
         ESP_LOGI(TAG, "connected, handle=%d", conn_handle);
-        /* 2M PHY and the connection interval the profile asks for. */
-        (void)ble_gap_set_prefered_le_phy(conn_handle, BLE_GAP_LE_PHY_2M_MASK,
-                                          BLE_GAP_LE_PHY_2M_MASK, 0);
+        log_conn_params("before update");
+        /* 2M PHY: request it and log whether the request was accepted. Whether the
+         * link actually uses it arrives later as PHY_UPDATE_COMPLETE -- the two are
+         * different facts and ADR-003 depends on the second one. */
+        {
+            const int phy_rc = ble_gap_set_prefered_le_phy(conn_handle, BLE_GAP_LE_PHY_2M_MASK,
+                                                           BLE_GAP_LE_PHY_2M_MASK, 0);
+            ESP_LOGI(TAG, "2M PHY requested, rc=%d (result arrives as a PHY event)", phy_rc);
+        }
         {
             struct ble_gap_upd_params upd = {
                 .itvl_min = 12,             /* 15 ms */
@@ -322,6 +448,17 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         conn_handle = BLE_HS_CONN_HANDLE_NONE;
         streaming = false;
         advertise();
+        return 0;
+
+    case BLE_GAP_EVENT_PHY_UPDATE_COMPLETE:
+        ESP_LOGI(TAG, "PHY updated: status=%d tx=%u rx=%u  (1=1M, 2=2M)",
+                 event->phy_updated.status, event->phy_updated.tx_phy,
+                 event->phy_updated.rx_phy);
+        return 0;
+
+    case BLE_GAP_EVENT_CONN_UPDATE:
+        ESP_LOGI(TAG, "connection update: status=%d", event->conn_update.status);
+        log_conn_params("after update");
         return 0;
 
     case BLE_GAP_EVENT_MTU:
@@ -388,6 +525,7 @@ void app_main(void)
 
     ble_svc_gap_init();
     ble_svc_gatt_init();
+    ble_svc_gap_device_name_set("probe-sim");
     ESP_ERROR_CHECK(ble_gatts_count_cfg(gatt_services));
     ESP_ERROR_CHECK(ble_gatts_add_svcs(gatt_services));
 
