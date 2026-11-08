@@ -155,7 +155,7 @@ function renderProbabilities(probabilities) {
       <td>${name} <span class="muted">${LABEL_ZH[name] ?? ""}</span></td>
       <td class="num">${pct}%</td>
       <td><div class="bar"><span style="width:${Math.min(100, probabilities[index] * 100)}%"></span></div></td>`;
-    if (index === top) row.style.fontWeight = "600";
+    if (index === top) row.className = "top";
     els.probs.appendChild(row);
   });
   els.verdict.textContent =
