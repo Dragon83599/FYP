@@ -17,7 +17,7 @@
  * the list covers every file the page fetches).
  */
 
-const CACHE_VERSION = "pcg-demo-v4";
+const CACHE_VERSION = "pcg-demo-v5";
 const CACHE = `pcg-demo-${CACHE_VERSION}`;
 
 // Everything the page asks for. Missing one entry means that file silently
