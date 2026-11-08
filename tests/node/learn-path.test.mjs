@@ -63,7 +63,7 @@ test("entries runoob cannot cover carry an official-doc link and a reason", () =
     assert.ok(item.note && item.note.length > 10, `${item.t}: an alt link needs a note saying why`);
   }
   const titles = alt.map((item) => item.t).join(" ");
-  for (const topic of ["SciPy", "AJAX", "TensorFlow"]) {
+  for (const topic of ["SciPy", "AJAX", "Keras"]) {
     assert.ok(titles.includes(topic), `no official-doc fallback for ${topic}`);
   }
 });
