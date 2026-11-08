@@ -52,6 +52,22 @@ test("every link points at runoob over https", () => {
   assert.deepEqual(bad.map((item) => `${item.t} -> ${item.u}`), []);
 });
 
+test("entries runoob cannot cover carry an official-doc link and a reason", () => {
+  // Three SciPy signal chapters, fetch, and Keras are not (or not usefully)
+  // covered by runoob; each must point somewhere that is, and say why.
+  const list = items();
+  const alt = list.filter((item) => item.alt);
+  assert.ok(alt.length >= 5, `expected at least 5 official-doc fallbacks, got ${alt.length}`);
+  for (const item of alt) {
+    assert.match(item.alt, /^https:\/\//, `${item.t}: alt link must be https`);
+    assert.ok(item.note && item.note.length > 10, `${item.t}: an alt link needs a note saying why`);
+  }
+  const titles = alt.map((item) => item.t).join(" ");
+  for (const topic of ["SciPy", "AJAX", "TensorFlow"]) {
+    assert.ok(titles.includes(topic), `no official-doc fallback for ${topic}`);
+  }
+});
+
 test("the required core is present and is a large share of the list", () => {
   const list = items();
   const must = list.filter((item) => item.tier === "must");

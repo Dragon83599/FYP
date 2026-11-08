@@ -51,6 +51,9 @@
   .why { color: var(--muted); font-size: .84rem; margin: .1rem 0 .25rem; }
   .check { font-size: .84rem; margin: .1rem 0 .35rem; }
   .check b { color: var(--accent); font-weight: 600; }
+  .note { font-size: .82rem; background: #a1620715; border-left: 3px solid var(--opt);
+          padding: .35rem .5rem; border-radius: .25rem; margin: .15rem 0 .35rem; }
+  .note a { color: var(--opt); }
   .cmd { display: flex; gap: .4rem; align-items: flex-start; margin-top: .3rem; }
   .cmd code { flex: 1; background: #8881; border-radius: .35rem; padding: .35rem .5rem;
               font: .76rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -217,16 +220,24 @@ const ITEMS = [
   // ---------- D. 信号处理 ----------
   { t: "SciPy · 教程总览（找 signal 那一章）", u: "https://www.runoob.com/scipy/scipy-tutorial.html", tier: "must",
     why: "降采样、滤波、功率谱——预处理的核心库。",
-    check: "找到 signal 章节，列出它提供的三类函数（滤波/重采样/谱分析）。" },
+    check: "说清 signal 模块提供的四类函数：滤波、重采样、谱分析、窗函数。",
+    alt: "https://docs.scipy.org/doc/scipy/reference/signal.html",
+    note: "runoob 的 SciPy 教程没有 signal 这一章（只有优化、稀疏、图、空间、插值、显著性检验），所以这一条去看官方文档。" },
   { t: "SciPy · signal · 重采样（resample_poly）", u: "https://www.runoob.com/scipy/scipy-tutorial.html", tier: "must",
     why: "8 kHz → 1 kHz 就是它；用 x[::8] 会造出假音。",
-    check: "能解释抗混叠滤波在抽取之前做什么。" },
+    check: "能解释抗混叠滤波在抽取之前做什么。",
+    alt: "https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.resample_poly.html",
+    note: "runoob 没有这一章；官方函数页有参数含义和示例，配第 2 条的混叠实验一起看。" },
   { t: "SciPy · signal · 滤波器（butter / sosfiltfilt）", u: "https://www.runoob.com/scipy/scipy-tutorial.html", tier: "must",
     why: "主线 20–1000 Hz 带通用它；sosfiltfilt 是零相位（不搬移波形）。",
-    check: "说清“零相位”解决了什么问题。" },
+    check: "说清“零相位”解决了什么问题。",
+    alt: "https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.sosfiltfilt.html",
+    note: "runoob 没有这一章；官方页说明了为什么用二阶节（sos）而不是高阶多项式系数。" },
   { t: "SciPy · signal · 功率谱（welch）", u: "https://www.runoob.com/scipy/scipy-tutorial.html", tier: "opt",
     why: "BER 指标就是用它算的。",
-    check: "说清“功率谱”和“波形”分别回答什么问题。" },
+    check: "说清“功率谱”和“波形”分别回答什么问题。",
+    alt: "https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.welch.html",
+    note: "runoob 没有这一章；重点看 nperseg（分辨率）与 noverlap 两个参数。" },
 
   // ---------- E. 可视化 ----------
   { t: "Matplotlib · 基础绘图", u: "https://www.runoob.com/matplotlib/matplotlib-tutorial.html", tier: "must",
@@ -265,7 +276,9 @@ const ITEMS = [
     check: "说清 await fetch(...) 在等什么。" },
   { t: "AJAX / fetch 请求", u: "https://www.runoob.com/ajax/ajax-tutorial.html", tier: "must",
     why: "页面靠它拿 model.json 和权重文件。",
-    check: "说清一次 fetch 从发出到拿到数据经历了什么。" },
+    check: "说清一次 fetch 从发出到拿到数据经历了什么。",
+    alt: "https://developer.mozilla.org/zh-CN/docs/Web/API/Fetch_API/Using_Fetch",
+    note: "runoob 的 AJAX 章节讲的是上一代 XMLHttpRequest，我们用的是 fetch + await；概念相通，写法不同。" },
   { t: "HTML DOM · 查找元素与事件", u: "https://www.runoob.com/htmldom/htmldom-tutorial.html", tier: "must",
     why: "按钮点击、结果写入页面都靠 DOM。",
     check: "给一个按钮绑定点击事件，点击后改一行文字。" },
@@ -279,7 +292,9 @@ const ITEMS = [
   // ---------- H. 深度学习框架 ----------
   { t: "TensorFlow 教程 · Sequential / Conv1D / fit / save", u: "https://www.runoob.com/tensorflow/tensorflow-tutorial.html", tier: "opt",
     why: "想自己改模型、重训时需要；复现已完成，不改也能交付。",
-    check: "用 Keras 搭一个 3 层 Sequential 并打印参数量。" },
+    check: "用 Keras 搭一个 3 层 Sequential 并打印参数量（应为 20,193）。",
+    alt: "https://www.tensorflow.org/guide/keras?hl=zh-cn",
+    note: "runoob 的 TensorFlow 教程偏薄且偏旧；官方 Keras 指南的 Sequential / Conv1D / fit 三节就够用。" },
 ];
 
 const FILTERS = { all: () => true, must: (i) => i.tier === "must", opt: (i) => i.tier === "opt",
@@ -350,6 +365,21 @@ function render() {
     check.innerHTML = "<b>学完要能回答：</b>";
     check.appendChild(document.createTextNode(item.check));
     li.appendChild(check);
+
+    if (item.note) {
+      const note = document.createElement("p");
+      note.className = "note";
+      note.textContent = item.note + " ";
+      if (item.alt) {
+        const altLink = document.createElement("a");
+        altLink.href = item.alt;
+        altLink.target = "_blank";
+        altLink.rel = "noopener";
+        altLink.textContent = "打开官方文档 →";
+        note.appendChild(altLink);
+      }
+      li.appendChild(note);
+    }
 
     const box = document.createElement("label");
     box.className = "donebox";
