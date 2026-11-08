@@ -156,7 +156,7 @@ def to_1khz(x: np.ndarray, fs: int) -> np.ndarray:
     return resample_poly(x, 1, fs // FS_TARGET)
 
 
-def crop_or_pad(x: np.ndarray) -> tuple[np.ndarray, bool, bool]:
+def crop_or_pad(x: np.ndarray, n_samples: int = N_SAMPLES) -> tuple[np.ndarray, bool, bool]:
     """Force exactly N_SAMPLES, measured from the start of the recording.
 
     PAPER: "long and zero-padded short recordings were cropped to make all
@@ -167,11 +167,11 @@ def crop_or_pad(x: np.ndarray) -> tuple[np.ndarray, bool, bool]:
     this copy: 950 cropped, 49 padded (shortest 1.16 s), 1 already exact.
     """
     cropped = padded = False
-    if x.shape[0] > N_SAMPLES:
-        x = x[:N_SAMPLES]
+    if x.shape[0] > n_samples:
+        x = x[:n_samples]
         cropped = True
-    elif x.shape[0] < N_SAMPLES:
-        x = np.pad(x, (0, N_SAMPLES - x.shape[0]))
+    elif x.shape[0] < n_samples:
+        x = np.pad(x, (0, n_samples - x.shape[0]))
         padded = True
     return x, cropped, padded
 
