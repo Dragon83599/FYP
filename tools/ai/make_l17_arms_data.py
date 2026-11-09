@@ -100,6 +100,29 @@ def random_start_clips(raw_dir: Path, rate: int, seed: int) -> np.ndarray:
     return np.stack(out)
 
 
+def swap_clips(raw_dir: Path, rate: int, seed: int) -> np.ndarray:
+    """The paper's perturbation (section 2.5): cut at an arbitrary point, swap halves.
+
+    Applied to the recording *before* pre-processing, exactly as the paper does,
+    so the resulting 2 s clip starts at a random phase of the cardiac cycle. The
+    same perturbed dataset is used for both training and testing, which is what
+    section 3.2 describes.
+    """
+    from repro_ma2023 import crop_or_pad, min_max_scale
+
+    rng = np.random.default_rng(seed)
+    out = []
+    for label in CLASSES:
+        for path in sorted((raw_dir / label).glob("*.wav")):
+            x, fs = read_wav_mono(path)
+            cut = int(rng.integers(0, x.shape[0])) if x.shape[0] > 1 else 0
+            x = np.concatenate([x[cut:], x[:cut]])
+            x = to_1khz(x, fs) if rate == 1000 else to_2khz(x, fs)
+            piece, _, _ = crop_or_pad(x, n_samples=rate * 2)
+            out.append(min_max_scale(piece).astype(np.float32))
+    return np.stack(out)
+
+
 def build(raw_dir: Path) -> dict[str, np.ndarray]:
     X_1k, y, clips = load_yaseen(raw_dir)          # L17 exactly: 1 kHz, min-max, no band-pass
     X_1k = X_1k[..., 0]
@@ -109,6 +132,9 @@ def build(raw_dir: Path) -> dict[str, np.ndarray]:
         "l17_bp400_1k": clips_with_band(raw_dir, (20.0, 400.0), 1000),
         "l17_bp150_1k": clips_with_band(raw_dir, (20.0, 150.0), 1000),
         "l17_1k_randstart": random_start_clips(raw_dir, 1000, seed=1234),
+        "l17_1k_swap": swap_clips(raw_dir, 1000, seed=20261109),
+        "l17_1k_swap2": swap_clips(raw_dir, 1000, seed=20261110),
+        "l17_1k_swap3": swap_clips(raw_dir, 1000, seed=20261111),
     }
     return datasets, y, clips
 

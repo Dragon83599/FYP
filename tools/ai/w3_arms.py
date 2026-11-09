@@ -59,6 +59,33 @@ ARMS = {
     "augA": {"dataset": "l17_1k", "kernel": 20, "augment": "realistic"},
     "augB": {"dataset": "l17_1k", "kernel": 20, "augment": "realistic+link"},
     "augC": {"dataset": "l17_1k", "kernel": 20, "augment": "all"},
+    # structural variants: the head decides whether the model can use absolute
+    # position as evidence (see ADR-056)
+    "gap": {"dataset": "l17_1k", "kernel": 20, "augment": None, "head": "gap"},
+    "gapA": {"dataset": "l17_1k", "kernel": 20, "augment": "realistic+link", "head": "gap"},
+    "gapB": {"dataset": "l17_1k", "kernel": 20, "augment": "all", "head": "gap"},
+    # GAP is already invariant to position, so spending augmentation on phase is
+    # wasted; this arm puts the whole budget into noise and link damage instead.
+    "gapN": {"dataset": "l17_1k", "kernel": 20, "augment": "noise+link", "head": "gap"},
+    # self-supervised pre-training (Ma 2023 section 2.3): conv layers copied from
+    # the upstream network, first conv frozen, everything else as in `base`
+    "ssl": {"dataset": "l17_1k", "kernel": 20, "augment": None, "ssl": True},
+    "sslAll": {"dataset": "l17_1k", "kernel": 20, "augment": None, "ssl": True,
+               "ssl_mode": "all"},
+    # the paper's robustness protocol: perturb the recordings, then train AND test
+    # on the perturbed dataset (§2.5 + §3.2)
+    "paperBase": {"dataset": "l17_1k_swap", "kernel": 20, "augment": None},
+    "paperSSL": {"dataset": "l17_1k_swap", "kernel": 20, "augment": None, "ssl": True},
+    # Algorithm 1 line 17 read literally: transfer every convolutional layer, freeze
+    # only the first (Fig. 1 draws the arrow from layer 1 only; the two disagree)
+    "paperSSLall": {"dataset": "l17_1k_swap", "kernel": 20, "augment": None,
+                    "ssl": True, "ssl_mode": "all"},
+    "paperSSLfree": {"dataset": "l17_1k_swap", "kernel": 20, "augment": None,
+                     "ssl": True, "ssl_mode": "nofreeze"},
+    "frozenRandom": {"dataset": "l17_1k_swap", "kernel": 20, "augment": None,
+                     "ssl": True, "ssl_mode": "random"},
+    "sslN": {"dataset": "l17_1k", "kernel": 20, "augment": "noise+link", "ssl": True},
+    "segs": {"dataset": "l17_1k", "kernel": 20, "augment": None, "head": "seg4"},
     "I1": {"dataset": "l17_2k", "kernel": 40, "augment": None},
     "I12a": {"dataset": "l17_bp400_1k", "kernel": 20, "augment": None},
     "I12b": {"dataset": "l17_bp150_1k", "kernel": 20, "augment": None},
@@ -73,7 +100,25 @@ ARMS = {
 #: leaves a step in the middle of the window. Both are kept so the difference is
 #: visible instead of assumed.
 CONDITIONS = ("clean", "randstart", "shift", "gain", "noise:0.1", "noise:0.2",
-              "noise:0.3", "hum", "muffle", "dropout")
+              "noise:0.3", "hum", "muffle", "dropout",
+              # the paper's Fig. 8a protocol: perturb first, then add noise on top
+              "pert_noise:0.05", "pert_noise:0.1", "pert_noise:0.15",
+              "pert_noise:0.2", "pert_noise:0.25", "pert_noise:0.3",
+              # the paper adds noise to the recording BEFORE the 1 kHz decimation,
+              # so only about 1/sqrt(8) of it survives into the model input
+              "paper:0.05", "paper:0.1", "paper:0.15",
+              "paper:0.2", "paper:0.25", "paper:0.3",
+              # the paper's own ladder, applied directly on the model input:
+              # sigma 0.05 .. 0.3 in steps of 0.05
+              "noise:0.05", "noise:0.15", "noise:0.25",
+              # a finer, weaker ladder: the paper reports 92-96 at its noisiest,
+              # which for our signal scale implies far less in-band noise than
+              # "paper:0.05" delivers -- so the comparable region has to be found
+              "paper:0.005", "paper:0.01", "paper:0.02", "paper:0.035")
+
+#: fraction of white-noise variance that survives an 8 kHz -> 1 kHz decimation,
+#: measured on this machine (theory says 1/sqrt(8) = 0.354)
+DECIMATION_NOISE_GAIN = 0.346
 
 
 # --------------------------------------------------------------------------
@@ -130,6 +175,14 @@ def apply_condition(X: np.ndarray, condition: str, seed: int,
             out[i] = np.roll(out[i], int(rng.integers(0, length)))
     elif condition == "gain":
         out *= rng.uniform(0.8, 1.2, size=(n, 1)).astype(np.float32)
+    elif condition.startswith("pert_noise:"):
+        for i in range(n):
+            out[i] = np.roll(out[i], int(rng.integers(0, length)))
+        sigma = float(condition.split(":")[1])
+        out += rng.normal(0.0, sigma, size=out.shape).astype(np.float32)
+    elif condition.startswith("paper:"):
+        sigma = float(condition.split(":")[1]) * DECIMATION_NOISE_GAIN
+        out += rng.normal(0.0, sigma, size=out.shape).astype(np.float32)
     elif condition.startswith("noise:"):
         sigma = float(condition.split(":")[1])
         out += rng.normal(0.0, sigma, size=out.shape).astype(np.float32)
@@ -160,27 +213,60 @@ def folds_for(y: np.ndarray, n_folds: int, seed: int) -> np.ndarray:
 # --------------------------------------------------------------------------
 # Model
 # --------------------------------------------------------------------------
-def build_model(input_length: int, kernel: int, n_classes: int = len(CLASSES)):
-    """L17's layer sequence, scaled to the input length."""
+def build_model(input_length: int, kernel: int, head: str = "flatten",
+                n_classes: int = len(CLASSES)):
+    """L17's layer sequence, with a choice of pooling head.
+
+    ``flatten``  the paper's own: 124 features, each with its own weight, so the
+                 fully connected layer can treat "activation at position 7" as
+                 evidence. 79% of the model's parameters live here.
+    ``gap``      average over time. The output says "which features occurred
+                 somewhere in the window", never where, so translation invariance
+                 comes from the structure instead of from augmentation.
+    ``gap+gmp``  average and maximum concatenated: keeps "the strongest segment"
+                 as well as "the typical segment".
+    ``seg4``     average over four temporal quarters: keeps coarse order, which
+                 the other two throw away -- the control for "is timing needed?".
+    """
     import tensorflow as tf
     from tensorflow import keras
     from tensorflow.keras import layers
 
-    return keras.Sequential(
-        [
-            keras.Input(shape=(input_length, 1), name="pcg"),
-            layers.Conv1D(16, kernel, padding="same", activation="tanh", name="conv1"),
-            layers.MaxPooling1D(4, name="pool1"),
-            layers.Conv1D(8, kernel, padding="same", activation="tanh", name="conv2"),
-            layers.MaxPooling1D(4, name="pool2"),
-            layers.Conv1D(4, kernel, padding="same", activation="tanh", name="conv3"),
-            layers.MaxPooling1D(4, name="pool3"),
-            layers.Flatten(name="flatten"),
-            layers.Dense(128, activation="tanh", name="fc"),
-            layers.Dense(n_classes, activation="softmax", name="out"),
-        ],
-        name=f"a3_k{kernel}",
-    )
+    inputs = keras.Input(shape=(input_length, 1), name="pcg")
+    x = layers.Conv1D(16, kernel, padding="same", activation="tanh", name="conv1")(inputs)
+    x = layers.MaxPooling1D(4, name="pool1")(x)
+    x = layers.Conv1D(8, kernel, padding="same", activation="tanh", name="conv2")(x)
+    x = layers.MaxPooling1D(4, name="pool2")(x)
+    x = layers.Conv1D(4, kernel, padding="same", activation="tanh", name="conv3")(x)
+    x = layers.MaxPooling1D(4, name="pool3")(x)
+
+    if head == "flatten":
+        x = layers.Flatten(name="flatten")(x)
+    elif head == "gap":
+        x = layers.GlobalAveragePooling1D(name="gap")(x)
+    elif head == "gap+gmp":
+        average = layers.GlobalAveragePooling1D(name="gap")(x)
+        strongest = layers.GlobalMaxPooling1D(name="gmp")(x)
+        x = layers.Concatenate(name="pool_cat")([average, strongest])
+    elif head == "seg4":
+        def quarters(tensor):
+            # 31 positions is not divisible by 4; trim to 28 and average each
+            # block of seven, rather than splitting into unequal parts.
+            length = tf.shape(tensor)[1]
+            usable = (length // 4) * 4
+            channels = tf.shape(tensor)[2]
+            trimmed = tensor[:, :usable, :]
+            blocks = tf.reshape(trimmed, (-1, 4, usable // 4, channels))
+            return tf.reduce_mean(blocks, axis=2)
+
+        x = layers.Lambda(quarters, output_shape=(4, 4), name="seg4")(x)
+        x = layers.Flatten(name="flatten")(x)
+    else:
+        raise SystemExit(f"unknown head {head}")
+
+    x = layers.Dense(128, activation="tanh", name="fc")(x)
+    outputs = layers.Dense(n_classes, activation="softmax", name="out")(x)
+    return keras.Model(inputs, outputs, name=f"a3_k{kernel}_{head.replace('+', '')}")
 
 
 # --------------------------------------------------------------------------
@@ -204,8 +290,8 @@ def augment_batch(x, y, family: str, seed: int):
     batch, length, _ = x.shape
     t = tf.range(tf.cast(length, tf.float32)) / 1000.0
     do_shift = family in ("shift", "realistic", "realistic+link", "all")
-    do_realistic = family in ("realistic", "realistic+link", "all")
-    do_link = family in ("realistic+link", "all")
+    do_realistic = family in ("realistic", "realistic+link", "all", "noise+link")
+    do_link = family in ("realistic+link", "all", "noise+link")
 
     if do_shift:
         offset = tf.random.uniform([], 0, length, dtype=tf.int32, seed=seed)
@@ -247,6 +333,107 @@ def augment_batch(x, y, family: str, seed: int):
     return x, y
 
 
+def apply_ssl(model, weights_path: Path, mode: str = "first"):
+    """Copy the upstream convolutional weights in and freeze the first layer.
+
+    The paper transfers **only the first convolutional layer** (336 parameters,
+    1.66% of the model) and freezes it; §Discussion reports that transferring and
+    freezing more than one layer *decreases* performance. ``mode="all"`` exists
+    only to test that claim, since the authors themselves did not.
+
+    Algorithm 1 of the paper: the convolutional parameters are transferred, then
+    the first convolutional layer is frozen before the downstream training. If
+    the files are missing this raises instead of silently training from scratch,
+    because a "SSL" arm that quietly fell back to random init would look like
+    evidence that pre-training does not help.
+    """
+    if mode == "random":
+        # ablation the authors never ran: freeze an untrained first layer, so the
+        # effect of *freezing* can be separated from the effect of *pre-training*.
+        model.get_layer("conv1").trainable = False
+        return model
+    path = weights_path / "conv_weights.npz"
+    if not path.exists():
+        raise SystemExit(f"{path} missing; run tools/ai/ssl_pretrain.py first")
+    data = np.load(path)
+    layers = ("conv1",) if mode == "first" else ("conv1", "conv2", "conv3")
+    for name in layers:
+        layer = model.get_layer(name)
+        layer.set_weights([data[f"{name}_0"], data[f"{name}_1"]])
+    # "nofreeze" is the control for the paper's claim that freezing the first
+    # layer is what helps; they never ran it themselves. "allfreeze" asks the
+    # complementary question: is the pretrained feature set destroyed by 100
+    # epochs of downstream training at lr 1e-3?
+    if mode == "allfreeze":
+        for name in ("conv1", "conv2", "conv3"):
+            model.get_layer(name).trainable = False
+    elif mode != "nofreeze":
+        model.get_layer("conv1").trainable = False
+    return model
+
+
+def fit_once(X, y, fit_idx, eval_idx, seed, lr, args, alt=None):
+    """Train on `fit_idx` and predict `eval_idx`. Used by the nested selection loop."""
+    import tensorflow as tf
+    from tensorflow import keras
+
+    tf.keras.utils.set_random_seed(seed)
+    Y = keras.utils.to_categorical(y, len(CLASSES))
+    model = build_model(X.shape[1], args.kernel, head=args.head)
+    if getattr(args, "ssl", False):
+        apply_ssl(model, args.ssl_weights, getattr(args, "ssl_mode", "first"))
+    model.compile(
+        optimizer=keras.optimizers.Adam(lr),
+        loss="categorical_crossentropy",
+        metrics=["accuracy"],
+    )
+
+    ds = tf.data.Dataset.from_tensor_slices((X[fit_idx], Y[fit_idx]))
+    ds = ds.shuffle(min(len(fit_idx), 1024), seed=seed, reshuffle_each_iteration=True)
+    ds = ds.batch(args.batch)
+    if args.augment:
+        ds = ds.map(lambda a, b: augment_batch(a, b, args.augment, seed),
+                    num_parallel_calls=tf.data.AUTOTUNE)
+    ds = ds.prefetch(tf.data.AUTOTUNE)
+
+    model.fit(ds, epochs=args.epochs, verbose=0)
+
+    probs = {}
+    for condition in CONDITIONS:
+        X_eval = apply_condition(X[eval_idx, :, 0], condition, seed,
+                                 alt=alt[eval_idx] if alt is not None else None,
+                                 renorm=args.renorm).astype(np.float32)[..., None]
+        probs[condition] = model.predict(X_eval, verbose=0)
+    del model
+    keras.backend.clear_session()
+    return probs
+
+
+def train_fold_selected(X, y, train_mask, test_mask, seed, args, alt=None):
+    """Pick the learning rate on an inner split, then train on the whole fold.
+
+    The paper reports neither the learning rate nor a validation split, and the
+    result turns out to be sensitive to it (about 1.6 points across 1e-3..5e-3).
+    Choosing it by looking at the test folds would leak, so it is chosen inside
+    each training fold and the test fold never participates.
+    """
+    inner_rng = np.random.default_rng(seed + 17)
+    train_idx = inner_rng.permutation(np.flatnonzero(train_mask))
+    n_val = max(1, int(round(0.15 * train_idx.size)))
+    val_idx, fit_idx = train_idx[:n_val], train_idx[n_val:]
+
+    best_score, best_lr = -1.0, args.lr_grid[0]
+    for lr in args.lr_grid:
+        probs = fit_once(X, y, fit_idx, val_idx, seed, lr, args, alt=alt)
+        score = macro_f1(y[val_idx], probs["clean"].argmax(axis=1))
+        if score > best_score:
+            best_score, best_lr = score, lr
+
+    probs = fit_once(X, y, np.flatnonzero(train_mask), test_mask, seed, best_lr, args, alt=alt)
+    return {"probs": probs, "lr": best_lr, "inner_f1": round(best_score * 100, 2),
+            "seconds": 0.0, "epochs": args.epochs}
+
+
 def train_fold(X, y, train_mask, test_mask, seed, args, alt=None):
     import tensorflow as tf
     from tensorflow import keras
@@ -254,13 +441,22 @@ def train_fold(X, y, train_mask, test_mask, seed, args, alt=None):
     tf.keras.utils.set_random_seed(seed)
 
     train_idx = np.flatnonzero(train_mask)
-    rng = np.random.default_rng(seed + 17)
-    rng.shuffle(train_idx)
-    n_val = max(1, int(round(0.15 * train_idx.size)))
-    val_idx, fit_idx = train_idx[:n_val], train_idx[n_val:]
+    if args.fixed_epochs:
+        # The paper trains on all nine folds (900 of 1,000 clips) for a fixed
+        # number of epochs. Holding out an inner validation split "just in case"
+        # silently trained every arm on 85% of that (765 clips), which is a
+        # different experiment -- and cost about half a point on clean data.
+        val_idx, fit_idx = np.empty(0, dtype=int), train_idx
+    else:
+        rng = np.random.default_rng(seed + 17)
+        rng.shuffle(train_idx)
+        n_val = max(1, int(round(0.15 * train_idx.size)))
+        val_idx, fit_idx = train_idx[:n_val], train_idx[n_val:]
 
     Y = keras.utils.to_categorical(y, len(CLASSES))
-    model = build_model(X.shape[1], args.kernel)
+    model = build_model(X.shape[1], args.kernel, head=args.head)
+    if getattr(args, "ssl", False):
+        apply_ssl(model, args.ssl_weights, getattr(args, "ssl_mode", "first"))
     model.compile(
         optimizer=keras.optimizers.Adam(args.lr),
         loss="categorical_crossentropy",
@@ -289,7 +485,7 @@ def train_fold(X, y, train_mask, test_mask, seed, args, alt=None):
         )
     history = model.fit(
         dataset(fit_idx, True),
-        validation_data=dataset(val_idx, False) if not args.fixed_epochs else None,
+        validation_data=None if args.fixed_epochs else dataset(val_idx, False),
         epochs=args.epochs,
         verbose=0,
         callbacks=callbacks,
@@ -353,7 +549,11 @@ def paired_bootstrap(y_true, pred_a, pred_b, n_boot=2000, seed=42) -> dict:
 # Runner
 # --------------------------------------------------------------------------
 def run_arm(arm: str, seeds, args) -> dict:
-    spec = ARMS[arm]
+    spec = dict(ARMS[arm])
+    if args.dataset:
+        spec["dataset"] = args.dataset
+    if args.ssl_mode:
+        spec["ssl_mode"] = args.ssl_mode
     X_raw, y = load_dataset(args.data_dir, spec["dataset"])
     X = X_raw[..., None]
     alt_path = args.data_dir / "l17_1k_randstart.npy"
@@ -361,8 +561,12 @@ def run_arm(arm: str, seeds, args) -> dict:
     fold = folds_for(y, args.folds, args.fold_seed)
     args.kernel = spec["kernel"]
     args.augment = spec["augment"]
+    args.head = spec.get("head", "flatten")
+    args.ssl = bool(spec.get("ssl", False))
+    args.ssl_mode = spec.get("ssl_mode", "first")
 
     n_windows = X.shape[0]
+    chosen = []
     seed_probs = {
         condition: np.zeros((len(seeds), n_windows, len(CLASSES)), dtype=np.float32)
         for condition in CONDITIONS
@@ -374,10 +578,15 @@ def run_arm(arm: str, seeds, args) -> dict:
             test_mask = fold == k
             train_mask = ~test_mask
             started = time.time()
-            result = train_fold(X, y, train_mask, test_mask, seed + k, args, alt=alt)
+            if args.select_lr:
+                result = train_fold_selected(X, y, train_mask, test_mask, seed + k, args, alt=alt)
+            else:
+                result = train_fold(X, y, train_mask, test_mask, seed + k, args, alt=alt)
             for condition, prob in result["probs"].items():
                 seed_probs[condition][s_index, test_mask] = prob
             fold_seconds.append(result["seconds"])
+            if args.select_lr:
+                chosen.append({"fold": int(k), "lr": result["lr"], "inner_f1": result["inner_f1"]})
             clean = macro_f1(y[test_mask], result["probs"]["clean"].argmax(axis=1)) * 100
             shifted = macro_f1(y[test_mask], result["probs"]["shift"].argmax(axis=1)) * 100
             print(
@@ -402,11 +611,14 @@ def run_arm(arm: str, seeds, args) -> dict:
             "dataset": spec["dataset"],
             "input_length": int(X.shape[1]),
             "kernel": spec["kernel"],
+            "head": args.head,
+            "ssl": bool(getattr(args, "ssl", False)),
         },
         "per_seed": [],
         "seconds_total": round(float(np.sum(fold_seconds)), 1),
         "seconds_per_fold_median": round(float(np.median(fold_seconds)), 1),
         "conditions": {},
+        "lr_selection": chosen,
     }
 
     for condition in CONDITIONS:
@@ -440,7 +652,10 @@ def run_arm(arm: str, seeds, args) -> dict:
         report["vs"] = base_dir.name
         report["comparison"] = {}
         for condition in CONDITIONS:
-            base_probs = np.load(base_dir / f"probs_{condition.replace(':', '')}.npy")
+            base_file = base_dir / f"probs_{condition.replace(':', '')}.npy"
+            if not base_file.exists():
+                continue
+            base_probs = np.load(base_file)
             mine = np.load(args.out / arm / f"probs_{condition.replace(':', '')}.npy")
             report["comparison"][condition] = paired_bootstrap(
                 base_y, base_probs.argmax(axis=1), mine.argmax(axis=1)
@@ -465,9 +680,18 @@ def main(argv=None) -> int:
     parser.add_argument("--batch", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--patience", type=int, default=8)
+    parser.add_argument("--ssl-weights", type=Path, default=Path("data/models/ssl"))
+    parser.add_argument("--dataset", default=None, help="override the arm's dataset")
+    parser.add_argument("--ssl-mode", default=None,
+                        choices=["first", "all", "nofreeze", "allfreeze", "random"],
+                        help="override the transfer mode")
     parser.add_argument("--renorm", action="store_true",
                         help="re-normalise to [-1, 1] after perturbing, the way an "
                              "acquisition chain's AGC would")
+    parser.add_argument("--select-lr", action="store_true",
+                        help="choose the learning rate on an inner split of each "
+                             "training fold (no test leakage)")
+    parser.add_argument("--lr-grid", type=float, nargs="+", default=[1e-3, 3e-3])
     parser.add_argument("--fixed-epochs", action="store_true",
                         help="train the whole budget instead of early stopping; "
                              "this is the recipe that produced the 98.4%% anchor")
@@ -482,11 +706,15 @@ def main(argv=None) -> int:
     (args.out / args.arm).mkdir(parents=True, exist_ok=True)
 
     if args.smoke:
-        spec = ARMS[args.arm]
+        spec = dict(ARMS[args.arm])
+        if args.dataset:
+            spec["dataset"] = args.dataset
         X, y = load_dataset(args.data_dir, spec["dataset"])
         X = X[..., None]
         fold = folds_for(y, args.folds, args.fold_seed)
         args.kernel, args.augment = spec["kernel"], spec["augment"]
+        args.head = spec.get("head", "flatten")
+        args.ssl = bool(spec.get("ssl", False))
         mask = fold == 0
         alt_path = args.data_dir / "l17_1k_randstart.npy"
         alt = np.load(alt_path).astype(np.float32) if alt_path.exists() else None
