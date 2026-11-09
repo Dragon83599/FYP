@@ -67,6 +67,16 @@ ARMS = {
     # GAP is already invariant to position, so spending augmentation on phase is
     # wasted; this arm puts the whole budget into noise and link damage instead.
     "gapN": {"dataset": "l17_1k", "kernel": 20, "augment": "noise+link", "head": "gap"},
+    "noiseOnly": {"dataset": "l17_1k", "kernel": 20, "augment": "noiseonly"},
+    # GAP already gives translation invariance, so the only augmentation this
+    # configuration should need is noise; the full realistic+link family was
+    # costing clean accuracy for effects it did not need.
+    "gapNoiseOnly": {"dataset": "l17_1k", "kernel": 20, "augment": "noiseonly",
+                     "head": "gap"},
+    # seg4 keeps coarse timing; it scored 2.7 points above GAP on clean data without
+    # any augmentation, so it may hold up better once noise augmentation is added
+    "seg4NoiseOnly": {"dataset": "l17_1k", "kernel": 20, "augment": "noiseonly",
+                      "head": "seg4"},
     # self-supervised pre-training (Ma 2023 section 2.3): conv layers copied from
     # the upstream network, first conv frozen, everything else as in `base`
     "ssl": {"dataset": "l17_1k", "kernel": 20, "augment": None, "ssl": True},
@@ -272,6 +282,9 @@ def build_model(input_length: int, kernel: int, head: str = "flatten",
 # --------------------------------------------------------------------------
 # Training
 # --------------------------------------------------------------------------
+NOISE_MAX = {"value": 0.15}
+
+
 def augment_batch(x, y, family: str, seed: int):
     """Training-time augmentation, chosen to imitate a real measurement.
 
@@ -296,6 +309,14 @@ def augment_batch(x, y, family: str, seed: int):
     if do_shift:
         offset = tf.random.uniform([], 0, length, dtype=tf.int32, seed=seed)
         x = tf.roll(x, offset, axis=1)
+
+    if family == "noiseonly":
+        # only additive Gaussian noise; the ceiling is the knob that trades clean
+        # accuracy for noise robustness, so it is configurable
+        ceiling = NOISE_MAX["value"]
+        sigma = tf.random.uniform([], 0.0, ceiling, seed=seed)
+        x = x + tf.random.normal(tf.shape(x), stddev=sigma, seed=seed)
+        return x, y
 
     if do_realistic:
         x = x * tf.random.uniform([], 0.8, 1.25, seed=seed)
@@ -356,7 +377,7 @@ def apply_ssl(model, weights_path: Path, mode: str = "first"):
     if not path.exists():
         raise SystemExit(f"{path} missing; run tools/ai/ssl_pretrain.py first")
     data = np.load(path)
-    layers = ("conv1",) if mode == "first" else ("conv1", "conv2", "conv3")
+    layers = ("conv1",) if mode in ("first", "first-nofreeze") else ("conv1", "conv2", "conv3")
     for name in layers:
         layer = model.get_layer(name)
         layer.set_weights([data[f"{name}_0"], data[f"{name}_1"]])
@@ -364,6 +385,8 @@ def apply_ssl(model, weights_path: Path, mode: str = "first"):
     # layer is what helps; they never ran it themselves. "allfreeze" asks the
     # complementary question: is the pretrained feature set destroyed by 100
     # epochs of downstream training at lr 1e-3?
+    if mode == "first-nofreeze":
+        return model          # transfer conv1 only, leave it trainable
     if mode == "allfreeze":
         for name in ("conv1", "conv2", "conv3"):
             model.get_layer(name).trainable = False
@@ -664,6 +687,76 @@ def run_arm(arm: str, seeds, args) -> dict:
     return report
 
 
+
+
+def offset_sweep(args) -> int:
+    """Train once, then measure accuracy as a function of circular offset.
+
+    Test-time augmentation can only help if accuracy actually varies with phase.
+    If the curve is flat, averaging over offsets averages noise and buys nothing --
+    which is worth knowing before building the averaging.
+    """
+    import tensorflow as tf
+    from tensorflow import keras
+
+    spec = dict(ARMS[args.arm])
+    if args.dataset:
+        spec["dataset"] = args.dataset
+    X_raw, y = load_dataset(args.data_dir, spec["dataset"])
+    X = X_raw[..., None]
+    fold = folds_for(y, args.folds, args.fold_seed)
+    args.kernel = spec["kernel"]
+    args.augment = spec["augment"]
+    args.head = spec.get("head", "flatten")
+    args.ssl = bool(spec.get("ssl", False))
+    args.ssl_mode = spec.get("ssl_mode", "first")
+
+    offsets = list(range(0, 2000, 250))
+    scores = {o: [] for o in offsets}
+    ensemble = {o: [] for o in offsets}
+
+    for k in range(args.folds):
+        test_mask = fold == k
+        fit_idx = np.flatnonzero(~test_mask)
+        eval_idx = np.flatnonzero(test_mask)
+        tf.keras.utils.set_random_seed(args.seeds[0] + k)
+        Y = keras.utils.to_categorical(y, len(CLASSES))
+        model = build_model(X.shape[1], args.kernel, head=args.head)
+        model.compile(optimizer=keras.optimizers.Adam(args.lr),
+                      loss="categorical_crossentropy", metrics=["accuracy"])
+        ds = tf.data.Dataset.from_tensor_slices((X[fit_idx], Y[fit_idx]))
+        ds = ds.shuffle(min(len(fit_idx), 1024), seed=args.seeds[0]).batch(args.batch)
+        if args.augment:
+            ds = ds.map(lambda a, b: augment_batch(a, b, args.augment, args.seeds[0]),
+                        num_parallel_calls=tf.data.AUTOTUNE)
+        model.fit(ds.prefetch(tf.data.AUTOTUNE), epochs=args.epochs, verbose=0)
+
+        for o in offsets:
+            shifted = np.roll(X[eval_idx, :, 0], o, axis=1)[..., None].astype(np.float32)
+            probs = model.predict(shifted, verbose=0)
+            ensemble[o].append(probs)
+            scores[o].append(macro_f1(y[eval_idx], probs.argmax(axis=1)) * 100)
+        print(f"  fold {k}: " + " ".join(f"{o}:{scores[o][-1]:.1f}" for o in offsets), flush=True)
+        del model
+        keras.backend.clear_session()
+
+    print("\noffset  mean macro F1 over folds")
+    for o in offsets:
+        print(f"  {o:4d}   {np.mean(scores[o]):6.2f}")
+
+    # what averaging over all offsets would give, fold by fold
+    avg_scores = []
+    for k in range(args.folds):
+        test_mask = fold == k
+        probs = np.mean([ensemble[o][k] for o in offsets], axis=0)
+        avg_scores.append(macro_f1(y[test_mask], probs.argmax(axis=1)) * 100)
+    print(f"\n多相位平均（{len(offsets)} 个相位）: {np.mean(avg_scores):.2f}")
+    print(f"单相位（offset=0）           : {np.mean(scores[0]):.2f}")
+    print(f"单相位（各相位最差）          : {min(np.mean(scores[o]) for o in offsets):.2f}")
+    print(f"单相位（各相位最好）          : {max(np.mean(scores[o]) for o in offsets):.2f}")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -683,11 +776,16 @@ def main(argv=None) -> int:
     parser.add_argument("--ssl-weights", type=Path, default=Path("data/models/ssl"))
     parser.add_argument("--dataset", default=None, help="override the arm's dataset")
     parser.add_argument("--ssl-mode", default=None,
-                        choices=["first", "all", "nofreeze", "allfreeze", "random"],
+                        choices=["first", "all", "nofreeze", "allfreeze", "random",
+                                 "first-nofreeze"],
                         help="override the transfer mode")
     parser.add_argument("--renorm", action="store_true",
                         help="re-normalise to [-1, 1] after perturbing, the way an "
                              "acquisition chain's AGC would")
+    parser.add_argument("--offset-sweep", action="store_true",
+                        help="measure accuracy vs circular offset, then test offset averaging")
+    parser.add_argument("--noise-max", type=float, default=0.15,
+                        help="ceiling of the Gaussian noise used by the noiseonly family")
     parser.add_argument("--select-lr", action="store_true",
                         help="choose the learning rate on an inner split of each "
                              "training fold (no test leakage)")
@@ -697,6 +795,7 @@ def main(argv=None) -> int:
                              "this is the recipe that produced the 98.4%% anchor")
     parser.add_argument("--smoke", action="store_true", help="one fold, two epochs: wiring only")
     args = parser.parse_args(argv)
+    NOISE_MAX["value"] = args.noise_max
 
     if args.smoke:
         args.seeds = [args.seeds[0]]
@@ -724,6 +823,9 @@ def main(argv=None) -> int:
               "seconds", round(result["seconds"], 1))
         return 0
 
+    if args.offset_sweep:
+        return offset_sweep(args)
+
     report = run_arm(args.arm, args.seeds, args)
     (args.out / args.arm / "report.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -737,6 +839,8 @@ def main(argv=None) -> int:
                      f" CI=[{c['ci95_pts'][0]:+.2f},{c['ci95_pts'][1]:+.2f}]")
         print(line)
     return 0
+
+
 
 
 if __name__ == "__main__":
