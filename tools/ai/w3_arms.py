@@ -77,6 +77,13 @@ ARMS = {
     # any augmentation, so it may hold up better once noise augmentation is added
     "seg4NoiseOnly": {"dataset": "l17_1k", "kernel": 20, "augment": "noiseonly",
                       "head": "seg4"},
+    # T5: does self-supervision add anything *on top of* noise augmentation?
+    # Every earlier SSL experiment used an un-augmented baseline, which is not the
+    # comparison the paper's numbers imply.
+    "sslNoise": {"dataset": "l17_1k", "kernel": 20, "augment": "noiseonly",
+                 "ssl": True, "ssl_mode": "nofreeze"},
+    "gapSslNoise": {"dataset": "l17_1k", "kernel": 20, "augment": "noiseonly",
+                    "ssl": True, "ssl_mode": "nofreeze", "head": "gap"},
     # self-supervised pre-training (Ma 2023 section 2.3): conv layers copied from
     # the upstream network, first conv frozen, everything else as in `base`
     "ssl": {"dataset": "l17_1k", "kernel": 20, "augment": None, "ssl": True},
@@ -284,6 +291,12 @@ def build_model(input_length: int, kernel: int, head: str = "flatten",
 # --------------------------------------------------------------------------
 NOISE_MAX = {"value": 0.15}
 
+#: Augmentation randomness is drawn per batch by default, which gives every sample
+#: in a batch the same sigma/shift/gain -- 32x less diversity than intended. The
+#: flag exists so the historical numbers stay reproducible, but comparisons should
+#: eventually be re-run with it on.
+AUG_PER_SAMPLE = {"value": False}
+
 
 def augment_batch(x, y, family: str, seed: int):
     """Training-time augmentation, chosen to imitate a real measurement.
@@ -310,12 +323,15 @@ def augment_batch(x, y, family: str, seed: int):
         offset = tf.random.uniform([], 0, length, dtype=tf.int32, seed=seed)
         x = tf.roll(x, offset, axis=1)
 
+    per_sample = AUG_PER_SAMPLE["value"]
+
     if family == "noiseonly":
         # only additive Gaussian noise; the ceiling is the knob that trades clean
         # accuracy for noise robustness, so it is configurable
         ceiling = NOISE_MAX["value"]
-        sigma = tf.random.uniform([], 0.0, ceiling, seed=seed)
-        x = x + tf.random.normal(tf.shape(x), stddev=sigma, seed=seed)
+        sigma = (tf.random.uniform([batch, 1, 1], 0.0, ceiling, seed=seed) if per_sample
+                 else tf.random.uniform([], 0.0, ceiling, seed=seed))
+        x = x + tf.random.normal(tf.shape(x), stddev=1.0, seed=seed) * sigma
         return x, y
 
     if do_realistic:
@@ -784,6 +800,8 @@ def main(argv=None) -> int:
                              "acquisition chain's AGC would")
     parser.add_argument("--offset-sweep", action="store_true",
                         help="measure accuracy vs circular offset, then test offset averaging")
+    parser.add_argument("--aug-per-sample", action="store_true",
+                        help="draw augmentation parameters per sample instead of per batch")
     parser.add_argument("--noise-max", type=float, default=0.15,
                         help="ceiling of the Gaussian noise used by the noiseonly family")
     parser.add_argument("--select-lr", action="store_true",
@@ -796,6 +814,7 @@ def main(argv=None) -> int:
     parser.add_argument("--smoke", action="store_true", help="one fold, two epochs: wiring only")
     args = parser.parse_args(argv)
     NOISE_MAX["value"] = args.noise_max
+    AUG_PER_SAMPLE["value"] = args.aug_per_sample
 
     if args.smoke:
         args.seeds = [args.seeds[0]]
