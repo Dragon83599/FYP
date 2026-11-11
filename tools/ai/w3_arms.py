@@ -68,6 +68,7 @@ ARMS = {
     # wasted; this arm puts the whole budget into noise and link damage instead.
     "gapN": {"dataset": "l17_1k", "kernel": 20, "augment": "noise+link", "head": "gap"},
     "noiseOnly": {"dataset": "l17_1k", "kernel": 20, "augment": "noiseonly"},
+    "shiftNoise": {"dataset": "l17_1k", "kernel": 20, "augment": "shift+noise"},
     # GAP already gives translation invariance, so the only augmentation this
     # configuration should need is noise; the full realistic+link family was
     # costing clean accuracy for effects it did not need.
@@ -324,6 +325,18 @@ def augment_batch(x, y, family: str, seed: int):
         x = tf.roll(x, offset, axis=1)
 
     per_sample = AUG_PER_SAMPLE["value"]
+
+    if family == "shift+noise":
+        # the clean head-to-head against GAP: only the two augmentations that the
+        # comparison needs, without the dropout/clipping that inflated the earlier
+        # "all" family
+        offset = tf.random.uniform([], 0, length, dtype=tf.int32, seed=seed)
+        x = tf.roll(x, offset, axis=1)
+        ceiling = NOISE_MAX["value"]
+        sigma = (tf.random.uniform([batch, 1, 1], 0.0, ceiling, seed=seed) if per_sample
+                 else tf.random.uniform([], 0.0, ceiling, seed=seed))
+        x = x + tf.random.normal(tf.shape(x), stddev=1.0, seed=seed) * sigma
+        return x, y
 
     if family == "noiseonly":
         # only additive Gaussian noise; the ceiling is the knob that trades clean
