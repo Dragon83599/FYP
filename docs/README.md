@@ -1,5 +1,8 @@
-# docs 目录导航（2026-10-29 整理）
+# docs 目录导航（2026-11-11 更新）
 
+> **新来的先读 [`handoff-2026-11-11.md`](handoff-2026-11-11.md)**：当前状态、三个存储位置、
+> 以及**本文这张导航里也过时了的条目**（本文的"29 篇 / ADR-033"等数字停在 2026-10-29）。
+>
 > 文件变多之后，按"**现在要用的**"和"**归档的**"分开。新来的先看这张表。
 
 ## 一、当前主线（五分类 VHD 端侧筛查）
@@ -8,12 +11,14 @@
 | --- | --- | --- |
 | **`workflow.md`** | **执行手册**（参数已定，可照做）| **每次动手前** |
 | `plan-5class-vhd.md` | 设计文档：为什么这样设计、各节依据 | 写论文/答辩 |
-| `engineering-decision-register.md` | 决策历史（ADR-006、020–033）| 改参数前必查 |
+| `engineering-decision-register.md` | 决策历史（ADR-001…057，**040 为跳号**）| 改参数前必查 |
 | `workflow-evidence.md` | 每个步骤的逐条文献证据 + 强弱 | 被问"依据是什么" |
 | `parameter-ledger.md` | 每个参数的出处（文献 / E4）| 写方法章节 |
 | `parameter-rationale.md` | 每个参数的一句话理由 + 怎么验证 | 答辩前背 |
 | `engineering-decision-guide.md` | 怎么写 ADR 的规则 | 新增决策时 |
-| **`handoff-2026-10-29.md`** | **交接文档**：当前状态、下一步、十条禁止 | **换对话开工前** |
+| **`handoff-2026-11-11.md`** | **交接文档**：当前状态、三个存储位置、文档陷阱、下一步 | **换对话开工前** |
+| `tasks/w3-plan.md` | **唯一任务队列**（T1–T13，验收标准与状态）| 每次动手前 |
+| `w3-robustness.md` | 鲁棒性实验的全部结果与结论（12 节）| 写实验章节 |
 | `deployment-platform-options.md` | 15 个部署平台候选 + 筛选 | 选板时 |
 | `tasks/w1-preprocess-checklist.md` | W1 开工清单 | 第一步 |
 | `tasks/w3-spike-plan.md` | 部署 spike 清单 | W3 |

@@ -3,10 +3,14 @@
 二体式无线听诊器：探头以 8 kHz 采集心音，经 BLE（LKA1 协议）送到主机 ESP32-S3，
 主机做波形显示、杂音筛查和心率估算。
 
-> **当前状态（2026-10-19）**：PC 侧证据链已完成——数据评估、模型对照、校准与工作点、
-> 容量研究、泛化探针、INT8 量化、部署导出，全部有可复现报告。
-> **唯一大缺口是上板实测**（尚未采购开发板，见 ADR-017）。
-> 交接文档：[`docs/handoff-2026-10-19.md`](docs/handoff-2026-10-19.md)
+> **当前状态（2026-11-11）**：主线已由"BLE 杂音二分类"切换为**五分类瓣膜病（AS/MS/MR/MVP/N）
+> 端侧筛查**（ADR-020），交付形态为手机浏览器 PWA。W1 预处理与 W2 复现 Ma 2023 已完成
+> （干净 macro F1 98.40、参数量 20,193 与原文一致、已真机验证），W3 鲁棒性与最终配置进行中。
+> 上述 BLE/固件/INT8 部分仍在仓库内可运行，作为工程可行性证据保留，不再是主线。
+>
+> **新对话先读**：[`docs/handoff-2026-11-11.md`](docs/handoff-2026-11-11.md)（含文档陷阱清单），
+> 任务队列见 [`docs/tasks/w3-plan.md`](docs/tasks/w3-plan.md)。
+> 旧交接（`handoff-2026-10-18/19/29.md`）保留但结论已过时。
 
 ## 系统基线
 
@@ -54,7 +58,7 @@
 ## 可运行验证
 
 ```bash
-# 测试基线：C 5 / Node 16 / Python 246
+# 测试基线：C 6 / Node 59 / Python 266（2026-11-11 实跑）
 cmake -S . -B build -DBUILD_TESTING=ON && cmake --build build && ctest --test-dir build --output-on-failure
 npm test
 .venv/bin/python -m unittest discover -s tests/python
@@ -75,7 +79,8 @@ cd firmware && idf.py set-target esp32s3 && idf.py build
 ## 文档索引
 
 **状态与交接**
-- `docs/handoff-2026-10-19.md`：当前状态、已确认数字、已知缺陷、下一步（**新对话先读这个**）
+- `docs/handoff-2026-11-11.md`：当前状态、三个存储位置、文档陷阱、下一步（**新对话先读这个**）
+- `docs/tasks/w3-plan.md`：**唯一任务队列**（T1–T13，含验收标准与状态）
 - `docs/implementation-roadmap.md`：软件实施进度
 - `docs/workflow-and-open-items.md`：工作流摘要、与队友的确认清单、我的后续任务
 - `docs/fyp-overall-workflow.md`：**全流程 9 阶段 / 89 任务**（含负责人、证据、验收、关键路径）
