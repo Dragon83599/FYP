@@ -34,7 +34,11 @@ import {
 } from "../../pwa/lka1.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const CLIP = path.join(ROOT, "data/raw/yaseen/extracted/AS/New_AS_001.wav");
+// The clip has to be committed, not read from data/: the dataset is gitignored,
+// so CI has no data/raw/yaseen and this test failed with ENOENT on every run.
+// pwa/samples/AS_001.wav is the same file byte for byte (sha256 bcf99c26…),
+// published with the demo page, so it doubles as the fixture.
+const CLIP = path.join(ROOT, "pwa/samples/AS_001.wav");
 
 function encodeClip() {
   const wav = readPcm16Wav(CLIP);

@@ -31,6 +31,7 @@ import numpy as np
 import torch
 from torch import nn
 
+from hs_features import normalize_window  # noqa: F401  re-exported for callers
 from large_model_experiment import (
     ARCHITECTURE_SPECS,
     CONV_ARCHITECTURES,
@@ -300,8 +301,8 @@ class NormalizationFreeCNN(nn.Module):
     samples that the host can do in integer code far more cheaply.
 
     Wrapping the trained model this way keeps the weights identical and moves
-    the standardization to the caller. ``normalize_window`` below is the
-    reference implementation the device must reproduce.
+    the standardization to the caller. ``normalize_window`` in ``hs_features``
+    is the reference implementation the device must reproduce.
     """
 
     def __init__(self, model: "Small1DCNN") -> None:
@@ -316,18 +317,9 @@ class NormalizationFreeCNN(nn.Module):
         return self.model.classifier(pooled).squeeze(-1)
 
 
-def normalize_window(windows: np.ndarray, epsilon: float = 1e-6) -> np.ndarray:
-    """Reference input standardization, shared by the exporter and the tests.
-
-    ``windows`` is ``[n, samples]`` or ``[n, 1, samples]``; returns the same
-    shape as float32. The device must reproduce this with ``mean`` and
-    ``std`` over the window (population std, as ``numpy.std`` / ``torch.std``
-    use by default here).
-    """
-    array = np.asarray(windows, dtype=np.float32)
-    mean = array.mean(axis=-1, keepdims=True)
-    std = array.std(axis=-1, keepdims=True)
-    return (array - mean) / (std + epsilon)
+# ``normalize_window`` used to be defined here; it moved to ``hs_features``
+# (pure NumPy) so the device-contract tests can run in CI, which installs only
+# NumPy. It is still importable from this module.
 
 
 def export_onnx(

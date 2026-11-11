@@ -177,3 +177,20 @@ def iter_windows(signal: np.ndarray, window_samples: int, hop_samples: int):
         return
     for start in range(0, len(signal) - window_samples + 1, hop_samples):
         yield start, signal[start : start + window_samples]
+
+
+def normalize_window(windows: np.ndarray, epsilon: float = 1e-6) -> np.ndarray:
+    """Reference input standardization, shared by the exporter and the tests.
+
+    ``windows`` is ``[n, samples]`` or ``[n, 1, samples]``; returns the same
+    shape as float32. The device must reproduce this with ``mean`` and
+    ``std`` over the window (population std, as ``numpy.std`` / ``torch.std``
+    use by default here).
+
+    This lives here, not in ``hs_cnn``, because it is pure NumPy: the contract
+    tests must run in CI, where only NumPy is installed.
+    """
+    array = np.asarray(windows, dtype=np.float32)
+    mean = array.mean(axis=-1, keepdims=True)
+    std = array.std(axis=-1, keepdims=True)
+    return (array - mean) / (std + epsilon)

@@ -20,7 +20,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "ai"))
 
-from hs_cnn import normalize_window  # noqa: E402
+from hs_features import normalize_window  # noqa: E402  pure NumPy: runs without torch
 
 
 def has_torch() -> bool:
